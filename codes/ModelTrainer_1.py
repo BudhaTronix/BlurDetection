@@ -28,10 +28,12 @@ def train_model(subject):
         optimizer.zero_grad()
         output = net(input_tensor)
         loss = criterion(output, batch_lbl)
+        output = 0
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
         counter += 1
+
 
     torch.save(net.state_dict(), model_path)
     return running_loss/counter
