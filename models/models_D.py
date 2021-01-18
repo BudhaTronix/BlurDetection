@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn
-from VesselSeg_UNet3d import U_Net
+from .VesselSeg_UNet3d import U_Net
 from torchvision import transforms
 
 

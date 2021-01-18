@@ -10,7 +10,7 @@ inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini"
 subs, dataset = datasetLoader(inp_path)
 net = D_Net().to(device)
 net.eval()
-PATH = 'model_U_Net.pth'
+PATH = './model_weights/model_U_Net.pth'
 net.load_state_dict(torch.load(PATH))
 print('Number of subjects in T1 dataset:', len(dataset))
 patch_size = 64,128,128
