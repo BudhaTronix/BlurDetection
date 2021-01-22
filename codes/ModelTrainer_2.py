@@ -1,6 +1,6 @@
 import torch
 import torchio as tio
-from models.models_D import D_Net
+from models_D import D_Net
 from torchvision import transforms
 import numpy as np
 
@@ -65,7 +65,7 @@ validation_loader = torch.utils.data.DataLoader(
 device = "cpu"#"cuda:6"
 net = D_Net().to(device)
 
-PATH = './model_weights/model_weight.pth'
+PATH = './cifar_net.pth'
 net.load_state_dict(torch.load(PATH))
 #criterion = torch.nn.BCEWithLogitsLoss()
 criterion = torch.nn.BCELoss()

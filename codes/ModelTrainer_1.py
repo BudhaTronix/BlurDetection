@@ -3,15 +3,17 @@ import random
 import torch
 import torchio as tio
 from codes.ImageTransformer import transform_subject
-from models.models_D import D_Net
+from models_D import D_Net
+from torchvision import transforms
 import torch.optim as optim
 from tqdm import tqdm
-model_path = './model_weights/model_U_Net.pth'
+model_path = 'model_U_Net.pth'
 path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1/"
+from torch.cuda.amp import autocast, GradScaler
 
 device = "cuda:6"
 net = D_Net().to(device)
-criterion = torch.nn.BCELoss()
+criterion = torch.nn.BCELoss() # MSE/L1
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 patch_size = 64,128,128
 patch_overlap = 0
@@ -22,18 +24,19 @@ def train_model(subject):
     batch_lbl = torch.Tensor(subject['label']).float().to(device)
     running_loss = 0.0
     counter = 0
+    scaler = GradScaler(enabled=True)
     for patches_batch in tqdm(patch_loader):
         input_tensor = patches_batch['image'][tio.DATA].float().to(device)
         #print(input_tensor.shape)
         optimizer.zero_grad()
-        output = net(input_tensor)
-        loss = criterion(output, batch_lbl)
-        output = 0
-        loss.backward()
-        optimizer.step()
+        with autocast(enabled=True):
+            output = net(input_tensor)
+            loss = criterion(output, batch_lbl)
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
         running_loss += loss.item()
         counter += 1
-
 
     torch.save(net.state_dict(), model_path)
     return running_loss/counter
