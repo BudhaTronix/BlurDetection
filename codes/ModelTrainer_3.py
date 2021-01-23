@@ -5,14 +5,12 @@ from tqdm import tqdm
 from models_D import D_Net
 import numpy as np
 from pathlib import Path
-from DatasetLoader import datasetLoader
 import torch.optim as optim
 from torch.utils.data.sampler import SubsetRandomSampler
-#img_path = 'IXI002-Guys-0828-T1.nii.gz'
 
+##############################################################################
+"""DATASET CREATION"""
 t1_inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1/"
-transform_type = 3
-training_split_ratio = 0.9
 
 print("##########Dataset Loader################")
 inpPath = Path(t1_inp_path)
@@ -24,15 +22,7 @@ dataset = tio.SubjectsDataset(subjects)
 print('Number of subjects in T1 dataset:', len(dataset))
 print("########################################\n\n")
 
-
-#Printing
-#print("##########Sample Printing###############")
-#sample_subject = dataset[0]
-#show_slices(sample_subject['image'])
-#print("Label : ",sample_subject['label'])
-#print("########################################\n\n")
-
-validation_split = .2
+validation_split = .1
 shuffle_dataset = True
 random_seed= 42
 batch_size = 1
@@ -54,21 +44,37 @@ train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
 validation_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                                 sampler=valid_sampler)
 ###################################################################################
+"""PRINTING"""
+#print("##########Sample Printing###############")
+#sample_subject = dataset[0]
+#show_slices(sample_subject['image'])
+#print("Label : ",sample_subject['label'])
+#print("########################################\n\n")
+###################################################################################
+"""TRANSFORMATIONS"""
 transform_1 = tio.Compose([tio.RandomGhosting((4, 10), (0, 1, 2), (.5, 1)), tio.RandomBlur((1, 2))])
 
 
 ###################################################################################
+"""TRAINING"""
 print("\n################# TRAINING ########################")
 device = "cuda:6"
 net = D_Net().to(device)
-PATH = './cifar_net.pth'
+model = D_Net()
+
+net = torch.nn.DataParallel(model, device_ids=[6, 5])
+patcher_batch_size = 4
+net.to(device)
+PATH = '../model_weights/BlurDetection_ModelWeights.pth'
 patch_size = 64,128,128
 patch_overlap = 0
+epochs = 10
+
 criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 print(len(train_loader))
 
-for epoch in range(2):
+for epoch in range(epochs):
     running_loss = 0.0
     counter = 0
     print("\n################# Epoch :", (epoch+1), " ########################")
@@ -76,24 +82,23 @@ for epoch in range(2):
         one_batch = next(iter(train_loader))
         batch_img = one_batch['image'][tio.DATA]#.float()
         batch_lbl = np.random.randint(2)
+        batch_img = batch_img.permute(0,1,4,2,3)
         batch_img = tio.Subject(image=tio.ScalarImage(tensor=batch_img.squeeze(0)))
 
         if (batch_lbl == 1):
             batch_img = transform_1(batch_img)
-            batch_lbl = [1]
-        else: batch_lbl = [0]
-
+            batch_lbl = 1
+        else: batch_lbl = 0
         grid_sampler = tio.inference.GridSampler(batch_img, patch_size, patch_overlap, )
-        patch_loader = torch.utils.data.DataLoader(grid_sampler,batch_size=1,shuffle=True)  # To be tested: batch_size as 1 and more. If works for more, make a param
+        patch_loader = torch.utils.data.DataLoader(grid_sampler,batch_size=patcher_batch_size,shuffle=True)  # To be tested: batch_size as 1 and more. If works for more, make a param
 
         scaler = GradScaler(enabled=True)
         for patches_batch in patch_loader:
             input_tensor = patches_batch['image'][tio.DATA].float().to(device)
-            # print(input_tensor.shape)
             optimizer.zero_grad()
             with autocast(enabled=True):
                 output = net(input_tensor)
-                loss = criterion(output, torch.Tensor(batch_lbl).to(device))
+                loss = criterion(output, torch.Tensor(batch_lbl*np.ones([patcher_batch_size,1])).to(device))
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -101,13 +106,13 @@ for epoch in range(2):
             counter += 1
 
     print("Loss :",running_loss/counter)
-    torch.save(net.state_dict(), PATH)
+    torch.save(net, PATH)
 
-torch.save(net.state_dict(), PATH)
+torch.save(net, PATH)
 
 #################################################################################
+"""VALIDATION"""
 print("\n################# VALIDATION ########################")
-
 
 def model_validation(batch_img, patch_size, patch_overlap):
     grid_sampler = tio.inference.GridSampler(batch_img, patch_size, patch_overlap, )
@@ -122,7 +127,6 @@ def model_validation(batch_img, patch_size, patch_overlap):
         with autocast(enabled=True):
             output = net(input_tensor)
             loss = criterion(output, torch.Tensor(batch_lbl).to(device))
-
         running_loss += loss.item()
         counter += 1
 

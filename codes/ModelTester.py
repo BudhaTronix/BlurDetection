@@ -8,11 +8,12 @@ from Display_Subjects import show_slices
 device = "cuda:6"
 inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini"
 subs, dataset = datasetLoader(inp_path)
-net = D_Net().to(device)
-net.eval()
-PATH = './cifar_net.pth'#'model_U_Net.pth'
-net.load_state_dict(torch.load(PATH))
 print('Number of subjects in T1 dataset:', len(dataset))
+
+PATH = '../model_weights/BlurDetection_ModelWeights.pth' #'model_U_Net.pth'
+net = torch.load(PATH)
+net.eval().to(device)
+
 patch_size = 64,128,128
 patch_overlap = 0
 c_sample = dataset[18]
@@ -35,18 +36,15 @@ with torch.no_grad():
     for patches_batch in tqdm(patch_loader):
         input_tensor = patches_batch['image'][tio.DATA].float().to(device)
         output = torch.sigmoid(net(input_tensor))
-        #locations = patches_batch[tio.LOCATION]
-        #aggregator.add_batch(output, locations)
+        print(output)
         tot_out = tot_out + output
-        output = 0
         counter +=1
-
     output_tensor = tot_out/counter
     if(output_tensor>0.5): output_tensor = 1
     else: output_tensor = 0
     out_1 = output_tensor
 
-
+    print("Another pic")
     #######################################################################
 
     batch_img = ic_sample
@@ -58,10 +56,7 @@ with torch.no_grad():
     for patches_batch in tqdm(patch_loader):
         input_tensor = patches_batch['image'][tio.DATA].float().to(device)
         output = torch.sigmoid(net(input_tensor))
-        #locations = patches_batch[tio.LOCATION]
-        #aggregator.add_batch(output, locations)
         tot_out = tot_out + output
-        output = 0
         counter +=1
 
     output_tensor = tot_out/counter
