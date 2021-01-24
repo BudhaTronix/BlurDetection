@@ -7,10 +7,11 @@ from tqdm import tqdm
 from Display_Subjects import show_slices
 device = "cuda:6"
 inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini"
-subs, dataset = datasetLoader(inp_path)
+_, dataset = datasetLoader(inp_path)
 print('Number of subjects in T1 dataset:', len(dataset))
 
-PATH = '../model_weights/BlurDetection_ModelWeights.pth' #'model_U_Net.pth'
+#PATH = '../model_weights/BlurDetection_ModelWeights.pth'
+PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU.pth' #model_U_Net.pth'
 net = torch.load(PATH)
 net.eval().to(device)
 
@@ -27,7 +28,10 @@ show_slices(c_sample['image'])
 show_slices(ic_sample['image'])
 #####################################################################
 with torch.no_grad():
-    batch_img = c_sample
+    batch_img = c_sample['image'][tio.DATA]
+    batch_img = batch_img.permute(0, 3, 1, 2)
+    batch_img = tio.Subject(image=tio.ScalarImage(tensor=batch_img))
+
     grid_sampler = tio.inference.GridSampler(batch_img, patch_size, patch_overlap,)
     patch_loader = torch.utils.data.DataLoader(grid_sampler,batch_size=1)
     #aggregator = tio.inference.GridAggregator(grid_sampler, overlap_mode="average")

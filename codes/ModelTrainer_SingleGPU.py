@@ -10,10 +10,11 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 ##############################################################################
 """DATASET CREATION"""
-t1_inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1/"
+t1_inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini/"
 
 print("##########Dataset Loader################")
 inpPath = Path(t1_inp_path)
+
 subjects = []
 for file_name in sorted(inpPath.glob("*.nii.gz")):
     subject = tio.Subject(image = tio.ScalarImage(file_name))
@@ -60,13 +61,10 @@ transform_1 = tio.Compose([tio.RandomGhosting((4, 10), (0, 1, 2), (.5, 1)), tio.
 print("\n################# TRAINING ########################")
 device = "cuda:6"
 net = D_Net().to(device)
-model = D_Net()
-
-net.to(device)
 PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU.pth'
 patch_size = 64,128,128
 patch_overlap = 0
-epochs = 10
+epochs = 30
 
 criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -80,7 +78,8 @@ for epoch in range(epochs):
         one_batch = next(iter(train_loader))
         batch_img = one_batch['image'][tio.DATA]#.float()
         batch_lbl = np.random.randint(2)
-        batch_img = batch_img.permute(0,1,4,2,3)
+        print("LABEL : ",batch_lbl)
+        batch_img = batch_img.permute(0,1,4,2,3) #Need to know if this is required or not
         batch_img = tio.Subject(image=tio.ScalarImage(tensor=batch_img.squeeze(0)))
 
         if (batch_lbl == 1):
@@ -96,7 +95,7 @@ for epoch in range(epochs):
             optimizer.zero_grad()
             with autocast(enabled=True):
                 output = net(input_tensor)
-                loss = criterion(output, batch_lbl.to(device))
+                loss = criterion(output, torch.Tensor(batch_lbl).to(device))
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -111,7 +110,7 @@ torch.save(net, PATH)
 #################################################################################
 """VALIDATION"""
 print("\n################# VALIDATION ########################")
-
+#TODO : Change the validation function
 def model_validation(batch_img, patch_size, patch_overlap):
     grid_sampler = tio.inference.GridSampler(batch_img, patch_size, patch_overlap, )
     patch_loader = torch.utils.data.DataLoader(grid_sampler, batch_size=1,
