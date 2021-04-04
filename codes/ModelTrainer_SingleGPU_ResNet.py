@@ -130,7 +130,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
         print('-' * 10)
 
         # Each epoch has a training and validation phase
-        for phase in [0, 1]:
+        for phase in [1, 1]:
             if phase == 0:
                 print("Model In Training mode")
                 model.train()  # Set model to training mode
@@ -148,6 +148,8 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
 
                 batch_lbl = []
                 for i in range(batch_size):
+                    if (phase == 1):
+                        print(batch_img.shape)
                     if torch.equal(batch_img[i,0], batch_img[i,1]):
                         batch_lbl.append([0])
                     else:
@@ -324,6 +326,6 @@ optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 # Setup the loss fxn
 #criterion = nn.CrossEntropyLoss()
 criterion = nn.BCEWithLogitsLoss()
-criterion = nn.L1Loss()
+#criterion = nn.L1Loss()
 # Train and evaluate
 model_ft, hist = train_model(model_ft, dataloader, criterion, optimizer_ft, num_epochs=num_epochs, is_inception=(model_name=="inception"))
