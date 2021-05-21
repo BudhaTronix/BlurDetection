@@ -1,6 +1,7 @@
 from __future__ import print_function
 from __future__ import division
 import torchio as tio
+from datetime import datetime
 from IPython.core import inputsplitter
 from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
@@ -17,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 import time
 import os
 import copy
-
+import random
 print("PyTorch Version: ", torch.__version__)
 print("Torchvision Version: ", torchvision.__version__)
 
@@ -31,7 +32,7 @@ torch.cuda.manual_seed(42)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=1, batch_size=4, num_epochs=10, corruptionDegree=10,
+    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=5, corruptionDegree=10,
                  device="cuda:4",translation=10,num_transforms=2, corruptionProbability=.75):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
@@ -50,7 +51,7 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET.pth'
+        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass.pth'
 
         self.corruptionDegree = corruptionDegree
 
@@ -59,55 +60,77 @@ class BlurDetection:
         self.num_transforms = num_transforms
 
         self.corruptionProbability = corruptionProbability
+        start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        self.writer = SummaryWriter('runs/BlurDetection')
+        TBLOGDIR = "runs/BlurDetection/{}".format(start_time)
+        self.writer = SummaryWriter(TBLOGDIR)
+
 
         self.device = device
 
     ##############################################################################
     """DATASET CREATION"""
 
-    #@property
+    @property
     def datasetCreation(self):
-        t1_inp_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini/"
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1/"
 
         print("##########Dataset Loader################")
-        inpPath = Path(t1_inp_path)
-        torch.manual_seed(42)
-        moco = MotionCorrupter(degrees=self.corruptionDegree,translation=self.translation,num_transforms=self.num_transforms)
-        prob_corrupt = self.corruptionProbability
-        patch_size = (256, 256, 1)
-        patch_per_vol = 146  # n_slices
-        patch_qlen = patch_per_vol * 4
-        moco_transforms = [
-            tio.Lambda(moco.perform, p=prob_corrupt),
-            tio.Lambda(moco.prepare, p=1)
-        ]
-        moco_transform = tio.Compose(moco_transforms)
+        moco0 = MotionCorrupter(degrees=0, translation=0, num_transforms=1)
+        moco1 = MotionCorrupter(degrees=10, translation=10, num_transforms=2)
+        moco2 = MotionCorrupter(degrees=20, translation=10, num_transforms=2)
+        moco3 = MotionCorrupter(degrees=30, translation=10, num_transforms=3)
+        moco4 = MotionCorrupter(degrees=40, translation=10, num_transforms=4)
+        prob_corrupt = 1
+        moco_transforms_0 = [tio.Lambda(moco0.perform, p=prob_corrupt), tio.Lambda(moco0.prepare, p=0)]
+        moco_transforms_1 = [tio.Lambda(moco1.perform, p=prob_corrupt), tio.Lambda(moco1.prepare, p=1)]
+        moco_transforms_2 = [tio.Lambda(moco2.perform, p=prob_corrupt), tio.Lambda(moco2.prepare, p=1)]
+        moco_transforms_3 = [tio.Lambda(moco3.perform, p=prob_corrupt), tio.Lambda(moco3.prepare, p=1)]
+        moco_transforms_4 = [tio.Lambda(moco4.perform, p=prob_corrupt), tio.Lambda(moco4.prepare, p=1)]
 
+        moco_transform_0 = tio.Compose(moco_transforms_0)
+        moco_transform_1 = tio.Compose(moco_transforms_1)
+        moco_transform_2 = tio.Compose(moco_transforms_2)
+        moco_transform_3 = tio.Compose(moco_transforms_3)
+        moco_transform_4 = tio.Compose(moco_transforms_4)
+        i = 1
         subjects = []
-        for file_name in sorted(inpPath.glob("*.nii.gz")):
-            subject = tio.Subject(image=tio.ScalarImage(file_name))
-            subjects.append(subject)
-        dataset = tio.SubjectsDataset(subjects, transform=moco_transform)
+        inpPath = Path(path)
+        print("Loading Dataset and Transforming.......")
+        for file_name in tqdm(sorted(inpPath.glob("*.nii.gz"))):
+            select = random.randint(0, 4)
+            if select == 0:
+                subject = tio.Subject(image=tio.ScalarImage(file_name), label=0)
+                s1 = moco_transform_0(subject)
+            elif select == 1:
+                subject = tio.Subject(image=tio.ScalarImage(file_name), label=1)
+                s1 = moco_transform_1(subject)
+            elif select == 2:
+                subject = tio.Subject(image=tio.ScalarImage(file_name), label=2)
+                s1 = moco_transform_2(subject)
+            elif select == 3:
+                subject = tio.Subject(image=tio.ScalarImage(file_name), label=3)
+                s1 = moco_transform_3(subject)
+            elif select == 4:
+                subject = tio.Subject(image=tio.ScalarImage(file_name), label=4)
+                s1 = moco_transform_4(subject)
 
+            #print(subject['label'])
+            #show_slices(subject['image'])
+            #show_slices_2(s1['image'][tio.DATA][1, :, :, :])
+            subjects.append(s1)
+            #if i==2:
+            #    break
+            #i = i+1
+        dataset = tio.SubjectsDataset(subjects)
 
-        sampler = tio.data.UniformSampler(patch_size)
-        dataset = tio.Queue(
-            subjects_dataset=dataset,
-            max_length=patch_qlen,
-            samples_per_volume=patch_per_vol,
-            sampler=sampler,
-            num_workers=0,
-            # start_background=False
-        )
         print('Number of subjects in T1 dataset:', len(dataset))
         print("########################################\n\n")
 
         validation_split = .1
         shuffle_dataset = True
         random_seed = 42
-        batch_size = 4
+        batch_size = 1
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -130,21 +153,6 @@ class BlurDetection:
         dataloader.append(val)
 
         return dataloader
-
-    ###################################################################################
-    """TRANSFORMATIONS"""
-    """
-
-    transform_0 = tio.Compose([tio.RandomAffine(image_interpolation='nearest')])
-    transform_1 = tio.Compose([tio.RandomGhosting((4, 10), (0, 1, 2), (.5, 1)), tio.RandomBlur((1, 2))])
-    # transform_3 = transform
-    preprocess = transforms.Compose([
-        # transforms.Resize(256),
-        # transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485], std=[0.229]),
-    ])
-    """
 
     ###################################################################################
     os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
@@ -175,77 +183,75 @@ class BlurDetection:
                 running_loss = 0.0
                 running_corrects = 0
                 counter = 0
+                c = 0
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
-                    batch_img = batch['image'][tio.DATA].float()
+                    batch_img = batch['image'][tio.DATA].squeeze()[0:1, :, :, :].float().to(self.device)
 
-                    batch_lbl = []
-                    for i in range(self.batch_size):
-                        # if phase == 1:
-                        #   print(batch_img.shape)
-                        if torch.equal(batch_img[i, 0], batch_img[i, 1]):
-                            batch_lbl.append([0])
-                        else:
-                            batch_lbl.append([1])
-                    batch_img = batch_img[:, 1, ...].unsqueeze(1).squeeze(-1)
+                    batch_lbl = batch['label']#.to(self.device)
+                    #batch_img = batch_img.permute(3, 0, 1, 2)
 
-                    labels = torch.Tensor(batch_lbl).float().to(self.device)
-                    inputs = batch_img
+                    labels = int(batch_lbl)
+                    one_hot = torch.zeros(1, 5, dtype=torch.long)
+                    one_hot[0][labels] = 1.0
+                    labels = one_hot.to(self.device)
+                    #inputs = batch_img
+                    image_set = batch_img.squeeze().permute(2, 0, 1)
+                    for i in range(len(image_set)-1):
+                        inputs = image_set[i:(i+1),:,:]
+                        inputs = inputs.unsqueeze(0)
 
-                    optimizer.zero_grad()
+                        optimizer.zero_grad()
 
-                    # forward
-                    with torch.set_grad_enabled(phase == 0):
-                        if is_inception and phase == 0:
-                            # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                            outputs, aux_outputs = model(inputs)
-                            loss1 = criterion(outputs, labels)
-                            loss2 = criterion(aux_outputs, labels)
-                            loss = loss1 + 0.4 * loss2
-                        else:
-                            with autocast(enabled=True):
-                                outputs = model(inputs.to(self.device))
-                                #print(outputs)
-                                loss = criterion(outputs, labels)
-                                # writer.add_scalar("Loss/train", loss, epoch)
-                                counter = counter + 1
+                        # forward
+                        with torch.set_grad_enabled(phase == 0):
+                            if is_inception and phase == 0:
+                                # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
+                                outputs, aux_outputs = model(inputs)
+                                loss1 = criterion(outputs, labels)
+                                loss2 = criterion(aux_outputs, labels)
+                                loss = loss1 + 0.4 * loss2
+                            else:
+                                with autocast(enabled=True):
+                                    outputs = model(inputs.to(self.device))
+                                    #print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
+                                    loss = criterion(outputs,torch.argmax(labels.to(self.device), 1).to(self.device))
+                                    # writer.add_scalar("Loss/train", loss, epoch)
+                                    counter = counter + 1
 
-                        _, preds = torch.max(outputs, 1)
+                            _, preds = torch.max(outputs, 1)
 
-                        # backward + optimize only if in training phase
-                        if phase == 0:
-                            loss.backward()
-                            optimizer.step()
+                            # backward + optimize only if in training phase
+                            if phase == 0:
+                                loss.backward()
+                                optimizer.step()
 
-                        # statistics
-                        running_loss += loss.item()  # * batch_img.shape[0]
-                        running_corrects += torch.sum(preds == labels.data)
+                            # statistics
+                            running_loss += loss.item()  # * batch_img.shape[0]
+                            running_corrects += torch.sum(preds == batch_lbl.data.to(self.device))
+                            if (i == 70):
+                                store = inputs
+                                store_lable = int(batch_lbl)
+                                store_pred = int(preds)
+                            #self.writer.add_scalar("Loss/train", loss.item(), c)
+                            #c = c+1
 
-                # epoch_loss = running_loss / len(dataloaders[phase].dataset)
-                # epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
+                self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
                 if phase == 0:
                     mode = "Train"
-                    self.writer.add_scalar("Loss/train", epoch_loss, epoch)
+                    self.writer.add_scalar("Loss/Epoch", epoch_loss, epoch)
                 else:
                     mode = "Val"
                     self.writer.add_scalar("Loss/val", epoch_loss, epoch)
 
-                    img_grid = torchvision.utils.make_grid(inputs,normalize=True)
+                    img_grid = torchvision.utils.make_grid(store,normalize=True)
                     temp = img_grid[:1, :, :]
-                    text = 'Four images ' + str(batch_lbl) + str(outputs)
+                    text = 'Class Expected:' + str(store_lable) + ' Class Output:' + str(store_pred)
                     print(text)
                     self.writer.add_image(text, temp)
-                    """
-                    import torchvision.utils as vutils
-                    writer.add_image('{}/output'.format(section),
-                     vutils.make_grid(outputs[0, 0, ..., int(AUGMENTATION_PARAMETERS['patch_size'] / 2)],
-                                      normalize=True,
-                                      scale_each=True),
-                     epoch)
 
-                    """
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
                 # deep copy the model
@@ -369,13 +375,13 @@ class BlurDetection:
                     print("\t", name)
 
         # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+        optimizer_ft = optim.SGD(params_to_update, lr=0.0001, momentum=0.9)
         #########################################################################
 
         # Setup the loss fxn
-        # criterion = nn.CrossEntropyLoss() - Use this for multiple class
-        criterion = nn.BCEWithLogitsLoss()
-        # criterion = nn.L1Loss()
+        criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        #criterion = nn.BCEWithLogitsLoss()
+        #criterion = nn.L1Loss()
 
         # Train and evaluate
         dataloader = self.datasetCreation
@@ -385,5 +391,5 @@ class BlurDetection:
         self.writer.close()
 
 
-#a = BlurDetection()
-#a.callFunction()
+a = BlurDetection()
+a.callFunction()

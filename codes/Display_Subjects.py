@@ -3,7 +3,7 @@ import torchio as tio
 import matplotlib.pyplot as plt
 import nibabel as nib
 
-#img_path = 'IXI002-Guys-0828-T1.nii.gz'
+img_path = "IXI002-Guys-0828-T1.nii.gz"
 #inp_path = "F:/Datasets/ixi_root"
 
 def show_slices_path(inp_path):
@@ -22,12 +22,33 @@ def show_slices_path(inp_path):
 def show_slices(subject):
     epi_img_data = subject[tio.DATA]
     epi_img_data = np.squeeze(epi_img_data)
-    slice_0 = epi_img_data[128, :, :]
+    slice_0 = epi_img_data[75, :, :]
     slice_1 = epi_img_data[:, 128, :]
-    slice_2 = epi_img_data[:, :, 75]
+    slice_2 = epi_img_data[:, :, 128]
     slices = [slice_0, slice_1, slice_2]
     fig, axes = plt.subplots(1, len(slices))
     for i, slice in enumerate(slices):
         axes[i].imshow(slice.T, cmap="gray", origin="lower")
     plt.suptitle("Center slices for EPI image")
     plt.show()
+
+def show_slices_2(subject_data):
+    epi_img_data = np.squeeze(subject_data)
+    slice_0 = epi_img_data[75, :, :]
+    slice_1 = epi_img_data[:, 128, :]
+    slice_2 = epi_img_data[:, :, 128]
+    slices = [slice_0, slice_1, slice_2]
+    fig, axes = plt.subplots(1, len(slices))
+    for i, slice in enumerate(slices):
+        axes[i].imshow(slice.T, cmap="gray", origin="lower")
+    plt.suptitle("Center slices for EPI image")
+    plt.show()
+
+
+def show_img(slices):
+    fig, axes = plt.subplots(1, len(slices))
+    for i, slice in enumerate(slices):
+        axes[i].imshow(slice.T, cmap="gray", origin="lower")
+    plt.suptitle("Center slices for EPI image")
+    plt.show()
+#show_slices_path(img_path)
