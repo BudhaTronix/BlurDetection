@@ -27,14 +27,13 @@ print("Torchvision Version: ", torchvision.__version__)
 torch.manual_seed(42)
 np.random.seed(42)
 torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
 
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=5, corruptionDegree=10,
-                 device="cuda:6",translation=10,num_transforms=2, corruptionProbability=.75):
+    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=100,device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -52,15 +51,8 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass.pth'
+        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader.pth'
 
-        self.corruptionDegree = corruptionDegree
-
-        self.translation = translation
-
-        self.num_transforms = num_transforms
-
-        self.corruptionProbability = corruptionProbability
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
         TBLOGDIR = "runs/BlurDetection/{}".format(start_time)
@@ -74,26 +66,26 @@ class BlurDetection:
 
     @property
     def datasetCreation(self):
-        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsoMini/"
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed/"
 
         print("##########Dataset Loader################")
         i = 1
         subjects = []
         inpPath = Path(path)
-        print("Loading Dataset and Transforming.......")
+        print("Loading Dataset.......")
         for file_name in tqdm(sorted(inpPath.glob("*.nii.gz"))):
-            subject = tio.Subject(image=tio.ScalarImage(file_name), label=0)
+            subject = tio.Subject(image=tio.ScalarImage(file_name), label=[int(str(file_name).split(".nii.gz")[0][-1])])
             subjects.append(subject)
         dataset = tio.SubjectsDataset(subjects)
 
 
-        print('Number of subjects in T1 dataset:', len(dataset))
+        print('Number of subjects in dataset:', len(dataset))
         print("########################################\n\n")
 
         validation_split = .1
-        shuffle_dataset = True
+        shuffle_dataset = False
         random_seed = 42
-        batch_size = 1
+        batch_size = 32
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -108,9 +100,9 @@ class BlurDetection:
         valid_sampler = SubsetRandomSampler(val_indices)
 
         train = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                            sampler=train_sampler)
-        val = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                          sampler=valid_sampler)
+                                            sampler=train_sampler, num_workers=4)
+        val = torch.utils.data.DataLoader(dataset, batch_size=16,
+                                          sampler=valid_sampler, num_workers=4)
         dataloader = []
 
         dataloader.append(train)
@@ -143,7 +135,9 @@ class BlurDetection:
                 else:
                     print("Model In Validation mode")
                     model.eval()  # Set model to evaluate mode
-
+                store = -1
+                store_lable = -1
+                store_pred = -1
                 running_loss = 0.0
                 running_corrects = 0
                 counter = 0
@@ -151,30 +145,26 @@ class BlurDetection:
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
                     #batch_img = batch['image'][tio.DATA].squeeze()[0:1, :, :, :].float().to(self.device)
-                    select = random.randint(0, 4)
-                    #batch_img = transform_subject(select,batch["image"][tio.DATA].squeeze(1))[0:1, :, :, :].float().to(self.device)
-                    batch_img = transform_subject_reality(select, batch["image"][tio.DATA].squeeze(1))[0:1, :, :, :].float().to(self.device)
-                    batch_lbl = select#batch['label']#.to(self.device)
-                    #batch_img = batch_img.permute(3, 0, 1, 2)
-
-                    labels = int(batch_lbl)
-                    one_hot = torch.zeros(1, 5, dtype=torch.long)
-                    one_hot[0][labels] = 1.0
-                    labels = one_hot.to(self.device)
-                    #inputs = batch_img
+                    #a = batch
+                    image_batch = batch["image"][tio.DATA].permute(1,0,2,3,4).squeeze()
+                    image_batch = image_batch/image_batch.max()
+                    labels_batch = batch["label"][0]
+                    image_batch = image_batch/image_batch.max()
                     select_orientation = random.randint(1, 3)
                     if select_orientation == 1:
-                        image_set = batch_img.squeeze() #Coronal
+                        image_batch = image_batch #Coronal
                     elif select_orientation == 2:
-                        image_set = batch_img.squeeze().permute(2, 0, 1)  # Transverse
+                        image_batch = image_batch.permute(0,2,3,1) # Transverse
                     elif select_orientation == 3:
-                        image_set = batch_img.squeeze().permute(1, 0, 2)  # Axial
+                        image_batch = image_batch.permute(0,3,2,1)  # Axial
 
-                    #image_set = batch_img.squeeze().permute(2, 0, 1)
-                    for i in range(len(image_set)-1):
-                        inputs = image_set[i:(i+1),:,:]
-                        inputs = inputs.unsqueeze(0)
 
+                    for i in range(0,len(image_batch[0])):
+                        #if phase == 0 and i >= (len(image_batch[0])-2):
+                            #l = len(image_batch[0])
+                            #print("Length:",l," i:",i," batch_shape:",image_batch[:, i:(i + 1), :, :].shape)
+                            #inputs = image_batch[:, i:(i + 1), :, :]
+                        inputs = image_batch[:,i:(i+1),:,:]
                         optimizer.zero_grad()
 
                         # forward
@@ -187,10 +177,11 @@ class BlurDetection:
                                 loss = loss1 + 0.4 * loss2
                             else:
                                 with autocast(enabled=True):
+                                    inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())
                                     outputs = model(inputs.to(self.device))
                                     #print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
-                                    loss = criterion(outputs,torch.argmax(labels.to(self.device), 1).to(self.device))
-                                    # writer.add_scalar("Loss/train", loss, epoch)
+                                    loss = criterion(outputs,labels_batch.to(self.device))
+                                    #self.writer.add_scalar("Loss/train", loss, epoch)
                                     counter = counter + 1
 
                             _, preds = torch.max(outputs, 1)
@@ -202,11 +193,11 @@ class BlurDetection:
 
                             # statistics
                             running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds == batch_lbl)#.data.to(self.device))
+                            running_corrects += torch.sum(preds == labels_batch.to(self.device))#.data.to(self.device))
                             if (i == 70):
                                 store = inputs
-                                store_lable = int(batch_lbl)
-                                store_pred = int(preds)
+                                store_lable = labels_batch.numpy()
+                                store_pred = preds.cpu().numpy()
                             #self.writer.add_scalar("Loss/train", loss.item(), c)
                             #c = c+1
 
@@ -229,11 +220,11 @@ class BlurDetection:
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
                 # deep copy the model
-                if phase == '1' and epoch_acc > best_acc:
-                    best_acc = epoch_acc
+                if phase == 1 and epoch_acc.item() > best_acc:
+                    best_acc = epoch_acc.item()
                     best_model_wts = copy.deepcopy(model.state_dict())
-                if phase == '1':
-                    val_acc_history.append(epoch_acc)
+                if phase == 1:
+                    val_acc_history.append(epoch_acc.data)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -349,7 +340,7 @@ class BlurDetection:
                     print("\t", name)
 
         # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.0001, momentum=0.9)
+        optimizer_ft = optim.SGD(params_to_update, lr=0.01, momentum=0.9)
         #########################################################################
 
         # Setup the loss fxn

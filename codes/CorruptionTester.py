@@ -1,65 +1,52 @@
 from Display_Subjects import show_slices, show_slices_2
+from ImageTransformer import transform_subject_reality,transform_subject
 from motion import MotionCorrupter
 from pathlib import Path
 import torchio as tio
-import random
-import torch
-from piq import ssim, SSIMLoss
+from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 import sewar
-
-path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini/"
+import numpy as np
+from torch.utils.tensorboard import SummaryWriter
+#path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/ixi_root/T1_mini/"
+path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsoMini/"
 ################################################################
-moco0 = MotionCorrupter(degrees=0, translation=0, num_transforms=1)
-moco1 = MotionCorrupter(degrees=10, translation=10, num_transforms=4)
-moco2 = MotionCorrupter(degrees=10, translation=10, num_transforms=4)
-moco3 = MotionCorrupter(degrees=10, translation=10, num_transforms=4)
-moco4 = MotionCorrupter(degrees=10, translation=10, num_transforms=4)
-prob_corrupt = 1
-moco_transforms_0 = [tio.Lambda(moco0.perform, p=prob_corrupt), tio.Lambda(moco0.prepare, p=0)]
-moco_transforms_1 = [tio.Lambda(moco1.perform, p=prob_corrupt), tio.Lambda(moco1.prepare, p=1)]
-moco_transforms_2 = [tio.Lambda(moco2.perform, p=prob_corrupt), tio.Lambda(moco2.prepare, p=1)]
-moco_transforms_3 = [tio.Lambda(moco3.perform, p=prob_corrupt), tio.Lambda(moco3.prepare, p=1)]
-moco_transforms_4 = [tio.Lambda(moco4.perform, p=prob_corrupt), tio.Lambda(moco4.prepare, p=1)]
-
-moco_transform_0 = tio.Compose(moco_transforms_0)
-moco_transform_1 = tio.Compose(moco_transforms_1)
-moco_transform_2 = tio.Compose(moco_transforms_2)
-moco_transform_3 = tio.Compose(moco_transforms_3)
-moco_transform_4 = tio.Compose(moco_transforms_4)
-
+TBLOGDIR = "runs/BlurDetection/SSIM"
+writer = SummaryWriter(TBLOGDIR)
 subjects = []
 inpPath = Path(path)
-for file_name in sorted(inpPath.glob("*.nii.gz")):
-    select = random.randint(0, 4)
-    if select == 0:
-        subject = tio.Subject(image=tio.ScalarImage(file_name), label=[0], )
-        s1 = moco_transform_0(subject)
-    elif select == 1:
-        subject = tio.Subject(image=tio.ScalarImage(file_name), label=[1])
-        s1 = moco_transform_1(subject)
-    elif select == 2:
-        subject = tio.Subject(image=tio.ScalarImage(file_name), label=[2])
-        s1 = moco_transform_2(subject)
-    elif select == 3:
-        subject = tio.Subject(image=tio.ScalarImage(file_name), label=[3])
-        s1 = moco_transform_3(subject)
-    elif select == 4:
-        subject = tio.Subject(image=tio.ScalarImage(file_name), label=[4])
-        s1 = moco_transform_4(subject)
-
-    print(subject['label'])
-    show_slices(subject['image'])
-    show_slices_2(s1['image'][tio.DATA][1, :, :, :])
-    subjects.append(s1)
-
-
-    #ssim_index: torch.Tensor = ssim(s1, subject[tio.DATA], data_range=1.)
-    #print(ssim_index)
-    GT = subject['image'][tio.DATA].squeeze().permute(2,0,1).numpy()
-    P = s1['image'][tio.DATA][1, :, :, :].permute(2,0,1).numpy()
-    print(sewar.full_ref.ergas(GT, P, r=4, ws=8))
-    print(sewar.full_ref.mse(GT, P))
-    print(sewar.full_ref.msssim(GT, P, weights=[0.0448, 0.2856, 0.3001, 0.2363, 0.1333], ws=11, K1=0.01, K2=0.03, MAX=None))
-
+disp = False
+for file_name in inpPath.glob("*.nii.gz"):
+    for i in range (1,5):
+        print("Corruption Level : ", i)
+        subject = tio.Subject(image=tio.ScalarImage(file_name))
+        text = "Corruption Level : " + str(i)
+        for j in range(1,6):
+            s = transform_subject_reality(i, subject["image"][tio.DATA].squeeze(1))
+            if disp == True and j==1:
+                #show_slices_2(s[1, :, :, :], text)
+                GT = s[1,:,:,:]
+                show_slices_2((GT-GT.min())/(GT.max()-GT.min()), text)
+            P = s[1, :, :, :].permute(2, 0, 1).numpy()
+            GT = s[0, :, :, :].permute(2, 0, 1).numpy()
+            GT = (GT-GT.min())/(GT.max()-GT.min())
+            P = (P-P.min())/(P.max()-P.min())
+            ssim = sewar.full_ref.ssim(GT, P, ws=11, K1=0.01, K2=0.03, MAX=1.0, fltr_specs=None, mode='valid')
+            MSE = sewar.full_ref.mse(GT, P)
+            UQI = sewar.full_ref.uqi(GT, P, ws=8)
+            print("SSIM - Iteration : ", (j) ," --> ",ssim)
+            print("MSE  - Iteration : ", (j) ," --> ", MSE)
+            print("UQI  - Iteration : ", (j) ," --> ",UQI)
+            writer.add_scalar("SSIM/{}".format(i), scalar_value=ssim[0], global_step=j)
+            writer.add_scalar("MSE/{}".format(i), MSE, j)
+            writer.add_scalar("UQI/{}".format(i), UQI, j)
+            #print("########################################")
+            """
+            GT_temp = subject['image'][tio.DATA].permute(3,0,1,2).float()
+            P_temp = t = s['image'][tio.DATA][0:1, :, :, :].permute(3,0,1,2)
+            GT_temp = (GT_temp + 1) / 2  # [-1, 1] => [0, 1]
+            P_temp = (P_temp + 1) / 2
+            ms_ssim_val = ms_ssim(GT_temp, P_temp, data_range=255, size_average=False)  # return (N,)
+            print(ms_ssim_val)
+            #ms_ssim_val = ms_ssim(X, Y, data_range=255, size_average=False)  # (N,)
+            """
     break
-

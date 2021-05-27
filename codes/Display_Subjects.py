@@ -19,7 +19,7 @@ def show_slices_path(inp_path):
     plt.suptitle("Center slices for EPI image")
     plt.show()
 
-def show_slices(subject):
+def show_slices(subject, text):
     epi_img_data = subject[tio.DATA]
     epi_img_data = np.squeeze(epi_img_data)
     slice_0 = epi_img_data[75, :, :]
@@ -29,10 +29,10 @@ def show_slices(subject):
     fig, axes = plt.subplots(1, len(slices))
     for i, slice in enumerate(slices):
         axes[i].imshow(slice.T, cmap="gray", origin="lower")
-    plt.suptitle("Center slices for EPI image")
+    plt.suptitle(text)
     plt.show()
 
-def show_slices_2(subject_data):
+def show_slices_2(subject_data, text):
     epi_img_data = np.squeeze(subject_data)
     slice_0 = epi_img_data[75, :, :]
     slice_1 = epi_img_data[:, 128, :]
@@ -41,7 +41,7 @@ def show_slices_2(subject_data):
     fig, axes = plt.subplots(1, len(slices))
     for i, slice in enumerate(slices):
         axes[i].imshow(slice.T, cmap="gray", origin="lower")
-    plt.suptitle("Center slices for EPI image")
+    plt.suptitle(text)
     plt.show()
 
 
