@@ -33,7 +33,7 @@ torch.cuda.manual_seed(42)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=100,device="cuda"):
+    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=50,device="cuda:6"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -55,7 +55,7 @@ class BlurDetection:
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/ClassificationModel/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
 
@@ -66,7 +66,10 @@ class BlurDetection:
 
     @property
     def datasetCreation(self):
-        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed/"
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Classification_FullVolume/"
+        patch_size = (230, 230, 134)
+        patch_per_vol = 1  # n_slices
+        patch_qlen = patch_per_vol * 2
 
         print("##########Dataset Loader################")
         i = 1
@@ -77,7 +80,15 @@ class BlurDetection:
             subject = tio.Subject(image=tio.ScalarImage(file_name), label=[int(str(file_name).split(".nii.gz")[0][-1])])
             subjects.append(subject)
         dataset = tio.SubjectsDataset(subjects)
-
+        sampler = tio.data.UniformSampler(patch_size)
+        dataset = tio.Queue(
+            subjects_dataset=dataset,
+            max_length=patch_qlen,
+            samples_per_volume=patch_per_vol,
+            sampler=sampler,
+            num_workers=0,
+            # start_background=True
+        )
 
         print('Number of subjects in dataset:', len(dataset))
         print("########################################\n\n")
@@ -85,7 +96,7 @@ class BlurDetection:
         validation_split = .1
         shuffle_dataset = False
         random_seed = 42
-        batch_size = 32
+        batch_size = 64
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -101,7 +112,7 @@ class BlurDetection:
 
         train = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                             sampler=train_sampler, num_workers=4)
-        val = torch.utils.data.DataLoader(dataset, batch_size=16,
+        val = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                           sampler=valid_sampler, num_workers=4)
         dataloader = []
 
@@ -116,7 +127,7 @@ class BlurDetection:
 
     ####################################################################################
 
-    def train_model(self, model, dataloaders, criterion, optimizer, num_epochs=10, is_inception=False):
+    def train_model(self, model, dataloaders, criterion, optimizer, num_epochs=100, is_inception=False):
         since = time.time()
         val_acc_history = []
 
@@ -144,12 +155,8 @@ class BlurDetection:
                 c = 0
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
-                    #batch_img = batch['image'][tio.DATA].squeeze()[0:1, :, :, :].float().to(self.device)
-                    #a = batch
                     image_batch = batch["image"][tio.DATA].permute(1,0,2,3,4).squeeze()
-                    image_batch = image_batch/image_batch.max()
                     labels_batch = batch["label"][0]
-                    image_batch = image_batch/image_batch.max()
                     select_orientation = random.randint(1, 3)
                     if select_orientation == 1:
                         image_batch = image_batch #Coronal
@@ -160,10 +167,6 @@ class BlurDetection:
 
 
                     for i in range(0,len(image_batch[0])):
-                        #if phase == 0 and i >= (len(image_batch[0])-2):
-                            #l = len(image_batch[0])
-                            #print("Length:",l," i:",i," batch_shape:",image_batch[:, i:(i + 1), :, :].shape)
-                            #inputs = image_batch[:, i:(i + 1), :, :]
                         inputs = image_batch[:,i:(i+1),:,:]
                         optimizer.zero_grad()
 
@@ -177,7 +180,8 @@ class BlurDetection:
                                 loss = loss1 + 0.4 * loss2
                             else:
                                 with autocast(enabled=True):
-                                    inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())
+                                    #inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())
+                                    inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                     outputs = model(inputs.to(self.device))
                                     #print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
                                     loss = criterion(outputs,labels_batch.to(self.device))
@@ -193,7 +197,7 @@ class BlurDetection:
 
                             # statistics
                             running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds == labels_batch.to(self.device))#.data.to(self.device))
+                            running_corrects += torch.sum(preds.cpu() == labels_batch)#.data.to(self.device))
                             if (i == 70):
                                 store = inputs
                                 store_lable = labels_batch.numpy()
@@ -232,7 +236,7 @@ class BlurDetection:
 
         # load best model weights
         model.load_state_dict(best_model_wts)
-        torch.save(model, self.PATH)
+        torch.save(model.state_dict(), self.PATH)
         return model, val_acc_history
 
     #################################################################################
@@ -340,7 +344,7 @@ class BlurDetection:
                     print("\t", name)
 
         # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.01, momentum=0.9)
+        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
         #########################################################################
 
         # Setup the loss fxn

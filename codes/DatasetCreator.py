@@ -8,29 +8,15 @@ import numpy as np
 import nibabel as nib
 import random
 from pathlib import Path
+from tqdm import tqdm
 from torchvision import transforms as transforms
 
 def create_subjectlist(inpPath):
-    l = 1000
-    b = 1000
-    h = 1000
-    inpPath = Path(inpPath)
-    """"
-    for file_name in sorted(inpPath.glob("*.nii.gz")):
-        testdata = (nib.load(file_name)).get_fdata()
-        if (len(testdata) < l): l = len(testdata)
-        if (len(testdata[0]) < b): b = len(testdata[0])
-        if (len(testdata[0][0]) < h): h = len(testdata[0][0])
-    print("Maximum Size allowed:", l, b, h)"""
-    #transform = transforms.ToTensor()
     subjects = []
-    #for file_name in sorted(inpPath.glob("*.nii.gz")):
+    inpPath = Path(inpPath)
     print("\n Loading Dataset")
-    for file_name in sorted(inpPath.glob("*.nii.gz")):
-        #file_path = os.path.join(inpPath, file_name)
+    for file_name in sorted(inpPath.glob("*T1*.nii.gz")):
         subject = tio.Subject(
-            #image = tio.ScalarImage(file_name),
-            #image = tio.ScalarImage(tensor=(transform((nib.load(file_name)).get_fdata()[:l,:b,:h]).unsqueeze(0))),
             image = tio.ScalarImage(file_name),
             filename = str(file_name.name),
         )
@@ -57,23 +43,42 @@ def datasetCreator_mode1(in_path,out_path):
         break
 
 
-def datasetCreator_mode2(in_path,out_path):
+def datasetCreator_mode2_classification(in_path,out_path):
     in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
-    out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed/"
+    out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Classification_FullVolume/"
     subjects_dataset = create_subjectlist(in_path)
     print("\n Corrupting Dataset")
-    i = 0
-    l = 134
-    b = 230
-    h = 230
+    i = 1
     for s in subjects_dataset:
         name = s["filename"]
         select = random.randint(0, 4)
-        img = transform_subject_reality(select, s["image"][tio.DATA].squeeze(1))[0:1, :b, :h, :l].float()
-        #data =  np.float32(np.abs(img.cpu().numpy().squeeze()))
-        #nib.save(nib.Nifti1Image(data, None), out_path +str(name.split(".nii.gz")[0])+"-"+str(select)+'.nii.gz')
+        img = transform_subject_reality(select, s["image"][tio.DATA].squeeze(1))[1:2, :, :, :].float()
         temp = tio.ScalarImage(tensor=img)
         temp.save(out_path +str(name.split(".nii.gz")[0])+"-"+str(select)+'.nii.gz',squeeze=True)
-        print('...corruption ', str(i+1), " done for ... ", s)
+        print('...corruption ', str(i), " done for ... ", s)
+        i = i + 1
 
-datasetCreator_mode2("","")
+def datasetCreator_mode2_regression(in_path, out_path):
+    in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
+    out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
+    #out_path = "/data/Project_ImgReg/"
+    subjects_dataset = create_subjectlist(in_path)
+    print("\n Corrupting Dataset....")
+    n_threads = 4
+    mu = 0.0
+    for i in range(1,6):
+        print('Corruption Iteration: ', str(i))
+        for s in tqdm(subjects_dataset):
+            name = s["filename"]
+            sigma = np.random.uniform(low=0.01, high=0.2, size=(1,))
+            moco = MotionCorrupter(mode=2, n_threads=n_threads, mu=mu, sigma=sigma, random_sigma=False)
+            transforms = [tio.Lambda(moco.perform, p=1)]
+            transform = tio.Compose(transforms)
+            img = transform(s["image"][tio.DATA])[1:2, :, :, :]
+            temp = tio.ScalarImage(tensor=img)
+            temp.save(out_path + str(name.split(".nii.gz")[0]) + "-" + str(sigma[0]) + '.nii.gz', squeeze=True)
+
+
+
+datasetCreator_mode2_regression("","")
+#datasetCreator_mode2_classification("","")

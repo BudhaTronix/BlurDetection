@@ -38,13 +38,13 @@ def transform_subject(trns_type,subject):
 
 def transform_subject_reality(trns_type,subject):
     n_threads = 48
-    mu = 0.1  ## 0.0 - 1.0
+    mu = 0.0  ## 0.0 - 1.0
 
     normalization_mode = 0
-    moco1 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.01, random_sigma=False,norm_mode=normalization_mode)
-    moco2 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.05, random_sigma=False,norm_mode=normalization_mode)
-    moco3 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.1, random_sigma=False,norm_mode=normalization_mode)
-    moco4 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.2, random_sigma=False,norm_mode=normalization_mode)
+    moco1 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.01, random_sigma=False)
+    moco2 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.05, random_sigma=False)
+    moco3 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.1, random_sigma=False)
+    moco4 = MotionCorrupter(mode=2,n_threads=n_threads, mu=mu, sigma=0.2, random_sigma=False)
 
     """
     prob_corrupt = 1
