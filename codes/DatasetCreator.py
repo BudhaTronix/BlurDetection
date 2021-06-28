@@ -1,7 +1,4 @@
-import os
 import torchio as tio
-import torch
-from pathlib import Path
 from motion import MotionCorrupter
 from ImageTransformer import transform_subject, transform_subject_reality
 import numpy as np
@@ -9,6 +6,7 @@ import nibabel as nib
 import random
 from pathlib import Path
 from tqdm import tqdm
+from test_3 import func
 from torchvision import transforms as transforms
 
 def create_subjectlist(inpPath):
@@ -61,12 +59,13 @@ def datasetCreator_mode2_classification(in_path,out_path):
 def datasetCreator_mode2_regression(in_path, out_path):
     in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
     out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
-    #out_path = "/data/Project_ImgReg/"
-    subjects_dataset = create_subjectlist(in_path)
+
+    #subjects_dataset = create_subjectlist(in_path)
+    subjects_dataset = func()
     print("\n Corrupting Dataset....")
-    n_threads = 4
+    n_threads = 5
     mu = 0.0
-    for i in range(1,6):
+    for i in range(1,2):
         print('Corruption Iteration: ', str(i))
         for s in tqdm(subjects_dataset):
             name = s["filename"]

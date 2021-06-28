@@ -2,13 +2,13 @@ from __future__ import print_function
 from __future__ import division
 import torchio as tio
 from datetime import datetime
-from IPython.core import inputsplitter
 from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from pathlib import Path
 from torch.utils.data.sampler import SubsetRandomSampler
 from motion import MotionCorrupter
 from ImageTransformer import transform_subject, transform_subject_reality
+import tempfile
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,8 +20,12 @@ import time
 import os
 import copy
 import random
+print("Current temp directory:", tempfile.gettempdir())
+tempfile.tempdir = "/home/mukhopad/tmp"
+print("Temp directory after change:", tempfile.gettempdir())
 print("PyTorch Version: ", torch.__version__)
 print("Torchvision Version: ", torchvision.__version__)
+
 
 # To make the model deterministic
 torch.manual_seed(42)
@@ -33,7 +37,7 @@ torch.autograd.set_detect_anomaly(True)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=1, batch_size=4, num_epochs=20,device="cuda:5"):
+    def __init__(self, model_name="resnet", num_classes=1, batch_size=4, num_epochs=100,device="cuda:6"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -51,11 +55,11 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg.pth'
+        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/Training/RegressionModel/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/RegressionModel_T1/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
 
@@ -66,61 +70,100 @@ class BlurDetection:
 
     @property
     def datasetCreation(self):
-        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_FullVolume/"
-
+        print("\n#################### RETRIVING INFORMATION ####################")
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
+        inpPath = Path(path)
+        output = []
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
-        patch_qlen = patch_per_vol * 4
+        patch_qlen = patch_per_vol * 10
+        val_split = .5
+        shuffle_dataset = False
+        random_seed = 42
+        batch_size = 128
 
-        print("##########Dataset Loader################")
-        i = 1
-        subjects = []
-        inpPath = Path(path)
-        print("Loading Dataset.......")
-        for file_name in tqdm(sorted(inpPath.glob("*.nii.gz"))):
-            subject = tio.Subject(image=tio.ScalarImage(file_name), label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
-            #print(subject["label"])
-            subjects.append(subject)
-        dataset = tio.SubjectsDataset(subjects)
 
-        # split here with scikit
+        for file_name in sorted(inpPath.glob("*.nii.gz")):
+            temp = str(file_name.name)
+            sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+            fileName = temp.replace(sigma, "")
+            if fileName not in output:
+                output.append(fileName)
+
+        print("Total Subjects: ", len(output))
+
+        Val = int(len(output) * val_split)
+        Train = len(output) - Val
+        print("Subjects in Training: ", Train)
+        print("Subjects in Validation: ", Val)
+
+        count = 0
+        train_subjects = []
+        val_subjects = []
+        print("\n#################### LOADING DATASET ####################")
+        for subject_id in tqdm(output):
+            #print("Subject ID :", subject_id)
+            if (count < Train):
+                for file_name in sorted(inpPath.glob(str("*" + subject_id + "*"))):
+                    # print("File Name in Train :",file_name)
+                    subject = tio.Subject(image=tio.ScalarImage(file_name),
+                                          label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
+                    train_subjects.append(subject)
+            else:
+                for file_name in sorted(inpPath.glob(str("*" + subject_id + "*"))):
+                    # print("File Name in Val :",file_name)
+                    subject = tio.Subject(image=tio.ScalarImage(file_name),
+                                          label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
+                    val_subjects.append(subject)
+            count += 1
+
+        print("Total files in Training: ", len(train_subjects))
+        print("Total files in Validation: ", len(val_subjects))
+
+        train_dataset = tio.SubjectsDataset(train_subjects)
+        val_dataset = tio.SubjectsDataset(val_subjects)
 
         sampler = tio.data.UniformSampler(patch_size)
-        dataset = tio.Queue(
-            subjects_dataset=dataset,
+        train_dataset = tio.Queue(
+            subjects_dataset=train_dataset,
             max_length=patch_qlen,
             samples_per_volume=patch_per_vol,
             sampler=sampler,
-            num_workers=0,
+            num_workers=2,
+            # start_background=True
+        )
+
+        val_dataset = tio.Queue(
+            subjects_dataset=val_dataset,
+            max_length=patch_qlen,
+            samples_per_volume=patch_per_vol,
+            sampler=sampler,
+            num_workers=2,
             #start_background=True
         )
 
+        train_dataset_size = len(train_dataset)
+        val_dataset_size = len(val_dataset)
+        print("Train Dataset Size:",train_dataset_size)
+        print("Validation Dataset Size:", val_dataset_size)
+
+        train_indices = list(range(train_dataset_size))
+        val_indices = list(range(val_dataset_size))
 
 
-        print('Number of subjects in dataset:', len(dataset))
-        print("########################################\n\n")
-
-        validation_split = .2
-        shuffle_dataset = False
-        random_seed = 42
-        batch_size = 16
-        # Creating data indices for training and validation splits:
-        dataset_size = len(dataset)
-        indices = list(range(dataset_size))
-        split = int(np.floor(validation_split * dataset_size))
         if shuffle_dataset:
             np.random.seed(random_seed)
-            np.random.shuffle(indices)
-        train_indices, val_indices = indices[split:], indices[:split]
+            np.random.shuffle(train_indices)
+            np.random.shuffle(val_indices)
 
-        # Creating PT data samplers and loaders:
         train_sampler = SubsetRandomSampler(train_indices)
         valid_sampler = SubsetRandomSampler(val_indices)
 
-        train = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                            sampler=train_sampler, num_workers=4)
-        val = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                          sampler=valid_sampler, num_workers=4)
+        train = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                            sampler=train_sampler, num_workers=0)
+        val = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
+                                          sampler=valid_sampler, num_workers=0)
+
         dataloader = []
 
         dataloader.append(train)
@@ -135,9 +178,10 @@ class BlurDetection:
     ####################################################################################
 
     def train_model(self, model, dataloaders, criterion, optimizer, num_epochs=10, is_inception=False):
+        print("\n#################### MODEL - TRAIN & VALIDATION ####################")
         since = time.time()
         val_acc_history = []
-
+        #model = torch.nn.DataParallel(model, device_ids=[6, 5])
         best_model_wts = copy.deepcopy(model.state_dict())
         best_acc = 0.0
 
@@ -153,13 +197,13 @@ class BlurDetection:
                 else:
                     print("Model In Validation mode")
                     model.eval()  # Set model to evaluate mode
-                store = -1
-                store_lable = -1
-                store_pred = -1
+                #store = -1
+                #store_lable = -1
+                #store_pred = -1
                 running_loss = 0.0
                 running_corrects = 0
                 counter = 0
-                c = 0
+                #c = 0
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
                     image_batch = batch["image"][tio.DATA].permute(1,0,2,3,4).squeeze(0)#[64,134,230,230]
@@ -183,8 +227,8 @@ class BlurDetection:
                             if is_inception and phase == 0:
                                 # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
                                 outputs, aux_outputs = model(inputs)
-                                loss1 = criterion(outputs, labels)
-                                loss2 = criterion(aux_outputs, labels)
+                                loss1 = criterion(outputs, labels_batch.unsqueeze(1).float().to(self.device))
+                                loss2 = criterion(aux_outputs, labels_batch.unsqueeze(1).float().to(self.device))
                                 loss = loss1 + 0.4 * loss2
                             else:
                                 with autocast(enabled=True):
@@ -195,7 +239,7 @@ class BlurDetection:
                                     counter = counter + 1
 
                             #_, preds = torch.max(outputs, 1)
-                            preds = outputs
+                            #preds = outputs
                             #outputs.squeeze().detach().cpu().float().numpy()
                             # backward + optimize only if in training phase
                             if phase == 0:
@@ -204,11 +248,11 @@ class BlurDetection:
 
                             # statistics
                             running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds.cpu() == labels_batch.float())#.data.to(self.device))
-                            if (i == 70):
-                                store = inputs
-                                store_lable = labels_batch.numpy()
-                                store_pred = preds.detach().cpu().numpy()
+                            running_corrects += torch.sum(outputs.cpu().squeeze() == labels_batch.float())#.data.to(self.device))
+                            #if (i == 70):
+                                #store = inputs
+                                #store_lable = labels_batch.numpy()
+                                #store_pred = preds.detach().cpu().numpy()
 
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
@@ -220,15 +264,15 @@ class BlurDetection:
                     mode = "Val"
                     self.writer.add_scalar("Loss/val", epoch_loss, epoch)
 
-                    img_grid = torchvision.utils.make_grid(store,normalize=True)
-                    temp = img_grid[:1, :, :]
-                    text = 'Class Expected:' + str(store_lable) + ' Class Output:' + str(store_pred)
-                    self.writer.add_image(text, temp)
+                    #img_grid = torchvision.utils.make_grid(store,normalize=True)
+                    #temp = img_grid[:1, :, :]
+                    #text = 'Class Expected:' + str(store_lable) + ' Class Output:' + str(store_pred)
+                    #self.writer.add_image(text, temp)
 
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
                 # deep copy the model
-                if phase == 1 and epoch_acc.item() > best_acc:
+                if phase == 1 and epoch_acc.item() >= best_acc:
                     best_acc = epoch_acc.item()
                     best_model_wts = copy.deepcopy(model.state_dict())
                 if phase == 1:
