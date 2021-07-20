@@ -58,14 +58,14 @@ def datasetCreator_mode2_classification(in_path,out_path):
 
 def datasetCreator_mode2_regression(in_path, out_path):
     in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
-    out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
+    out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1_set2/"
 
-    #subjects_dataset = create_subjectlist(in_path)
-    subjects_dataset = func()
+    subjects_dataset = create_subjectlist(in_path)
+    #subjects_dataset = func()
     print("\n Corrupting Dataset....")
     n_threads = 5
     mu = 0.0
-    for i in range(1,2):
+    for i in range(1,6):
         print('Corruption Iteration: ', str(i))
         for s in tqdm(subjects_dataset):
             name = s["filename"]

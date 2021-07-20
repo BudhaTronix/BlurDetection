@@ -34,8 +34,8 @@ global subjects
 subjects = []
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=10,
-                 device="cuda:6"):
+    def __init__(self, model_name="resnet", num_classes=4, batch_size=4, num_epochs=1000,
+                 device="cuda:4"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -53,17 +53,17 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_TorchIO.pth'
+        self.PATH = '../model_weights/SGPU_RESNET_MultiClass_TorchIO_Regression.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/TorchIO_Regression/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
 
         self.device = device
 
-    def initialize_global_var():
+    def initialize_global_var(self):
         global subjects  # Needed to modify global copy of globvar
         subjects = []
     ##############################################################################
@@ -75,9 +75,10 @@ class BlurDetection:
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
         patch_qlen = patch_per_vol * 4
-        shuffle_dataset = False
+        validation_split = .3
+        shuffle_dataset = True
         random_seed = 42
-        batch_size = 64
+        batch_size = 32
 
         print("##########Dataset Loader################")
 
@@ -90,7 +91,7 @@ class BlurDetection:
         for file_name in tqdm(sorted(inpPath.glob("*T1*.nii.gz"))):
             file_index.append(file_name)
 
-        no_threads = 6
+        no_threads = 10
 
         chunks = np.array_split(file_index, no_threads)
         i = 0
@@ -123,10 +124,7 @@ class BlurDetection:
         print('Number of subjects in T1 dataset:', len(dataset))
         print("########################################\n\n")
 
-        validation_split = .2
-        shuffle_dataset = True
-        random_seed = 42
-        batch_size = 64
+
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -186,7 +184,16 @@ class BlurDetection:
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
                     image_batch = batch["image"][tio.DATA].permute(1, 0, 2, 3, 4).squeeze(0)
-                    labels_batch = batch["label"][0]
+                    #labels_batch = batch["label"]
+                    label_batch = []
+                    for i in range(len(batch["intensity"][0].tolist())):
+                        temp = []
+                        temp.append(batch["intensity"][0].tolist()[i])
+                        temp.append(batch["degrees"][0].tolist()[i])
+                        temp.append(batch["translation"][0].tolist()[i])
+                        temp.append(batch["num_transforms"][0].tolist()[i])
+                        label_batch.append(temp)
+                    label_batch = torch.FloatTensor(label_batch)
                     select_orientation = random.randint(1, 3)
                     if select_orientation == 1:
                         image_batch = image_batch  # Coronal
@@ -205,18 +212,15 @@ class BlurDetection:
                             if is_inception and phase == 0:
                                 # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
                                 outputs, aux_outputs = model(inputs)
-                                loss1 = criterion(outputs, labels)
-                                loss2 = criterion(aux_outputs, labels)
+                                loss1 = criterion(outputs, label_batch)
+                                loss2 = criterion(aux_outputs, label_batch)
                                 loss = loss1 + 0.4 * loss2
                             else:
                                 with autocast(enabled=True):
                                     inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                     outputs = model(inputs.to(self.device))
-                                    # print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
-                                    loss = criterion(outputs, labels_batch.to(self.device))
+                                    loss = criterion(outputs, label_batch.to(self.device))
                                     counter = counter + 1
-
-                            _, preds = torch.max(outputs, 1)
 
                             # backward + optimize only if in training phase
                             if phase == 0:
@@ -225,13 +229,7 @@ class BlurDetection:
 
                             # statistics
                             running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds.cpu() == labels_batch)#.data.to(self.device))
-                            if (i == 70):
-                                store = inputs
-                                store_lable = labels_batch.cpu().numpy()
-                                store_pred = preds.cpu().numpy()
-                            #self.writer.add_scalar("Loss/train", loss.item(), c)
-                            #c = c+1
+                            running_corrects += torch.sum(outputs.cpu() == label_batch)#.data.to(self.device))
 
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
@@ -242,12 +240,6 @@ class BlurDetection:
                 else:
                     mode = "Val"
                     self.writer.add_scalar("Loss/val", epoch_loss, epoch)
-
-                    img_grid = torchvision.utils.make_grid(store,normalize=True)
-                    temp = img_grid[:1, :, :]
-                    text = 'Class Expected:' + str(store_lable) + ' \nClass Output:' + str(store_pred)
-                    print(text)
-                    self.writer.add_image(text, temp)
 
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
@@ -377,7 +369,8 @@ class BlurDetection:
         #########################################################################
 
         # Setup the loss fxn
-        criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        #criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        criterion = nn.MSELoss()
 
         model_ft, hist = self.train_model(model_ft, criterion, optimizer_ft, num_epochs=self.num_epochs,
                                           is_inception=(self.model_name == "inception"))
@@ -395,31 +388,22 @@ class myThread(threading.Thread):
         print("\nStarting " + self.name)
         for file_name in sorted(self.file_batch):
             axis = random.randint(0, 2)
-            i = random.randint(0, 4.0)
-            subject = tio.Subject(image=tio.ScalarImage(file_name), label=[0])
-            moco = tio.transforms.Ghosting(num_ghosts=10, intensity=0.4 * i, axis=axis, restore=0)
-            for i in range(0,5):
-                if(i==0):
-                    s_transformed = subject
-                else:
-                    moco = tio.transforms.Ghosting(num_ghosts=10, intensity=0.4*i, axis=axis, restore=0)
-                    s_transformed = moco.apply_transform(subject)
-                    s_transformed["label"] = [int(i)]
-                subjects.append(s_transformed)
-                #print("\nThread : ", self.threadID, "  Count : ", count)
+            intensity = random.randint(0, 10)
+            degrees = random.randint(0, 10)
+            translation = random.randint(1, 10)
+            num_transforms = random.randint(1, 10)
+            subject = tio.Subject(image=tio.ScalarImage(file_name), intensity=[0],degrees=[0], translation=[0],num_transforms=[0])
+            transforms = [tio.transforms.Ghosting(num_ghosts=10, intensity=intensity, axis=axis, restore=0),
+                          tio.transforms.RandomMotion(degrees=degrees, translation=translation,
+                                                      image_interpolation='linear', num_transforms=num_transforms)]
+            moco = tio.Compose(transforms)
+            s_transformed = moco.apply_transform(subject)
+            s_transformed["intensity"] = [intensity]
+            s_transformed["degrees"] = [degrees]
+            s_transformed["translation"] = [translation]
+            s_transformed["num_transforms"] = [num_transforms]
+            subjects.append(s_transformed)
         print("\nExiting " + self.name)
 
 a = BlurDetection()
 a.callFunction()
-
-i = random.randint(0, 4.0)
-transform = tio.Compose([
-	tio.transforms.RandomMotion(degrees = 0,
-								translation= 10,
-								num_transforms = 15,
-								image_interpolation= 'linear'),
-	tio.transforms.RandomGhosting(num_ghosts = (15, 15),
-								axes = (0, 1, 2),
-								intensity = (0.5, 1),
-								restore = 0.02)
-	])
