@@ -15,6 +15,7 @@ from torchvision import datasets, models
 from torch.utils.tensorboard import SummaryWriter
 import time
 import os
+from models import ResNet
 import copy
 import random
 import threading
@@ -31,7 +32,7 @@ global subjects
 subjects = []
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=6, batch_size=1, num_epochs=100,
+    def __init__(self, model_name="resnet", num_classes=6, batch_size=1, num_epochs=1000,
                  device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
@@ -50,7 +51,7 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/SGPU_RESNET_MultiClass_TorchIO_Classification.pth'
+        self.PATH = '/home/budha/PycharmProjects/BlurDetection/model_weights/SGPU_RESNET_MultiClass_TorchIO_Classification.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
@@ -72,7 +73,7 @@ class BlurDetection:
         path = "/media/hdd_storage/Budha/Dataset/Isotropic"
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
-        patch_qlen = patch_per_vol * 1
+        patch_qlen = patch_per_vol * 2
         shuffle_dataset = False
         random_seed = 42
         batch_size = 1
@@ -90,6 +91,7 @@ class BlurDetection:
 
 
         dataset = tio.SubjectsDataset(subjects)
+        """
         sampler = tio.data.UniformSampler(patch_size)
         dataset = tio.Queue(
             subjects_dataset=dataset,
@@ -99,11 +101,14 @@ class BlurDetection:
             num_workers=0,
             # start_background=True
         )
+        
+        """
+
 
         print('Number of subjects in T1 dataset:', len(dataset))
         print("########################################\n\n")
 
-        validation_split = .1
+        validation_split = .2
         shuffle_dataset = True
         random_seed = 42
         batch_size = 1
@@ -166,7 +171,6 @@ class BlurDetection:
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
                     image_batch = batch["image"][tio.DATA].permute(1, 0, 2, 3, 4).squeeze(0)
-                    labels_batch = batch["label"][0]
                     axis = random.randint(0, 2)
                     i = random.randint(0, 5)
                     if (i == 0):
@@ -178,7 +182,7 @@ class BlurDetection:
                                       ]
                         moco = tio.Compose(transforms)
                         image_batch = moco.apply_transform(image_batch)
-                    image_batch["label"] = torch.Tensor([i])
+                    labels_batch = torch.Tensor([i])
                     select_orientation = random.randint(1, 3)
                     if select_orientation == 1:
                         image_batch = image_batch  # Coronal
@@ -205,7 +209,7 @@ class BlurDetection:
                                     inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                     outputs = model(inputs.to(self.device))
                                     # print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
-                                    loss = criterion(outputs, labels_batch.to(self.device))
+                                    loss = criterion(outputs, labels_batch.long().to(self.device))
                                     counter = counter + 1
 
                             _, preds = torch.max(outputs, 1)
@@ -225,9 +229,11 @@ class BlurDetection:
                             #self.writer.add_scalar("Loss/train", loss.item(), c)
                             #c = c+1
 
+
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
                 #self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
+                print(epoch_loss)
                 if phase == 0:
                     mode = "Train"
                     self.writer.add_scalar("Loss/Epoch", epoch_loss, epoch)
@@ -276,7 +282,7 @@ class BlurDetection:
         if model_name == "resnet":
             """ Resnet18
             """
-            model_ft = models.resnet101(pretrained=use_pretrained)
+            model_ft = ResNet.resnet101(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             self.set_parameter_requires_grad(model_ft, feature_extract)
             num_ftrs = model_ft.fc.in_features

@@ -6,16 +6,13 @@ import numpy as np
 
 
 output = []
-path = "/media/hdd_storage/Budha/Dataset/Isotropic"
+path = "/media/hdd_storage/Budha/Dataset/Regression/"
 inpPath = Path(path)
 for file_name in sorted(inpPath.glob("*.nii.gz")):
     temp = str(file_name.name)
-    #sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
-    #fileName = temp.replace(sigma, "")
     fileName = temp
     if fileName not in output:
         output.append(fileName)
-
 
 print("Total Files : ", len(output))
 
@@ -28,3 +25,13 @@ for file_name in sorted(inpPath.glob("*.nii.gz")):
         output.append(fileName)
 
 print("Total Subjects : ", len(output))
+
+for subject in output:
+    c = 0
+    for file_name in sorted(inpPath.glob("*.nii.gz")):
+        temp = str(file_name.name)
+        sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+        fileName = temp.replace(sigma, "")
+        if fileName == subject:
+            c = c + 1
+    print(subject, " - ",c)

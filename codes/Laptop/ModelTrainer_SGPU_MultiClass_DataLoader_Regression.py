@@ -18,7 +18,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 from tqdm import tqdm
-from models.ResNet import resnet18
+from models.ResNet import resnet101
 
 print("Current temp directory:", tempfile.gettempdir())
 tempfile.tempdir = "/home/mukhopad/tmp"
@@ -38,7 +38,7 @@ torch.autograd.set_detect_anomaly(True)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=1, batch_size=1, num_epochs=2, device="cuda:0"):
+    def __init__(self, model_name="resnet", num_classes=1, batch_size=2, num_epochs=2, device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -56,7 +56,7 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET101_MultiClass_DataLoader_Reg_T1.pth'
+        self.PATH = '/home/budha/PycharmProjects/BlurDetection/model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET101_MultiClass_DataLoader_Reg_T1.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
@@ -72,12 +72,12 @@ class BlurDetection:
     def datasetCreation(self):
         print("\n#################### RETRIVING INFORMATION ####################")
         #path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
-        path = "/media/hdd_storage/Budha/Dataset/Regression/Done/"
+        path = "/media/hdd_storage/Budha/Dataset/Regression/"
         inpPath = Path(path)
         output = []
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
-        patch_qlen = patch_per_vol * 5
+        patch_qlen = patch_per_vol * 2
         val_split = .3
         shuffle_dataset = False
         random_seed = 42
@@ -297,7 +297,7 @@ class BlurDetection:
             """
             #model_ft = models.resnet18(pretrained=use_pretrained)
             #model_ft = models.resnet101(pretrained=use_pretrained)
-            model_ft = resnet18(pretrained=use_pretrained)
+            model_ft = resnet101(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             #model_ft = model_ft.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
             self.set_parameter_requires_grad(model_ft, feature_extract)

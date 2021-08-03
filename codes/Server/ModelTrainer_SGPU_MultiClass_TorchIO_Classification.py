@@ -31,7 +31,7 @@ global subjects
 subjects = []
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=6, batch_size=4, num_epochs=100,
+    def __init__(self, model_name="resnet", num_classes=6, batch_size=2, num_epochs=100,
                  device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name

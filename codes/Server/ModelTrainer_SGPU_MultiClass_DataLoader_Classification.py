@@ -33,7 +33,7 @@ torch.cuda.manual_seed(42)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=5, batch_size=4, num_epochs=50,device="cuda:6"):
+    def __init__(self, model_name="resnet", num_classes=5, batch_size=2, num_epochs=50,device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 

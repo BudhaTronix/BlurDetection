@@ -188,7 +188,7 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.Dropout = nn.Dropout(p=0.25)
+        #self.Dropout = nn.Dropout(p=0.25)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -237,7 +237,7 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.Dropout(x)
+        #x = self.Dropout(x)
         x = self.maxpool(x)
 
         x = self.layer1(x)
