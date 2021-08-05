@@ -7,10 +7,10 @@ import numpy as np
 from codes.Utils.motion import MotionCorrupter
 
 output = []
-path = "/media/hdd_storage/Budha/Dataset/a/"
+path = "/media/hdd_storage/Budha/Dataset/Regression/"
 in_path = "/media/hdd_storage/Budha/Dataset/Isotropic/"
-out_path = "/media/hdd_storage/Budha/Dataset/a/"
-inPath = Path(in_path)
+out_path = "/media/hdd_storage/Budha/Dataset/Regression/"
+
 mainPath = Path(in_path)
 inpPath = Path(path)
 for file_name in sorted(inpPath.glob("*.nii.gz")):

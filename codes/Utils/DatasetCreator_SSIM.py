@@ -3,11 +3,12 @@ import torchio as tio
 from pathlib import Path
 import os
 
-
 path_reg = "/media/hdd_storage/Budha/Dataset/reg_2/"
 path_main = "/media/hdd_storage/Budha/Dataset/Isotropic/"
 regPath = Path(path_reg)
 mainPath = Path(path_main)
+f = open("details.txt", "w+")
+f.write("Filename,Sigma,SSIM\r\n")
 for reg_fileName in regPath.glob("*.nii.gz"):
     regFilePath = reg_fileName
     temp = str(reg_fileName.name)
@@ -26,5 +27,9 @@ for reg_fileName in regPath.glob("*.nii.gz"):
             tempStr = str(reg_fileName + "-" + str(ssim) + ".nii.gz")
             print(regFilePath.name)
             print(tempStr)
+            temp = str(reg_fileName) + "," + str(si) + "," + str(ssim) + "\r\n"
+            f.write(temp)
 
-            os.rename(regFilePath,Path(regFilePath.parent, tempStr))
+            os.rename(regFilePath, Path(regFilePath.parent, tempStr))
+
+f.close()
