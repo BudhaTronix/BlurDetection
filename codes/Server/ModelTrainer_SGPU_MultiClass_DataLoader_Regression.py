@@ -18,11 +18,12 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 from tqdm import tqdm
-from models.ResNet import resnet18
+import os
+#from models.ResNet import resnet18
 
-#print("Current temp directory:", tempfile.gettempdir())
-#tempfile.tempdir = "/home/mukhopad/tmp"
-#print("Temp directory after change:", tempfile.gettempdir())
+print("Current temp directory:", tempfile.gettempdir())
+tempfile.tempdir = "/home/mukhopad/tmp"
+print("Temp directory after change:", tempfile.gettempdir())
 print("PyTorch Version: ", torch.__version__)
 print("Torchvision Version: ", torchvision.__version__)
 
@@ -38,7 +39,7 @@ torch.autograd.set_detect_anomaly(True)
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=1, batch_size=4, num_epochs=1000, device="cuda"):
+    def __init__(self, model_name="resnet", num_classes=1, batch_size=64, num_epochs=1000, device="cuda:6"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -56,11 +57,11 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET101_MultiClass_DataLoader_Reg_T1.pth'
+        self.PATH = '../../model_weights/RESNET101_MultiClass_DataLoader_Reg_T1.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/Training/RegressionModel_T1_Densenet/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/RegressionModel_T1_Resnet_SSIM/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
         self.device = device
@@ -71,8 +72,8 @@ class BlurDetection:
     @property
     def datasetCreation(self):
         print("\n#################### RETRIVING INFORMATION ####################")
-        #path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
-        path = "/media/hdd_storage/Budha/Dataset/Regression/"
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM_Regression/"
+        #path = "/media/hdd_storage/Budha/Dataset/Regression/"
         inpPath = Path(path)
         output = []
         patch_size = (230, 230, 134)
@@ -168,8 +169,8 @@ class BlurDetection:
         return dataloader
 
     ###################################################################################
-    #os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
-    #os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
+    os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
+    os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
 
     ####################################################################################
 
@@ -274,7 +275,7 @@ class BlurDetection:
 
         # load best model weights
         model.load_state_dict(best_model_wts)
-        PATH = '../../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1_bestWeights.pth'
+        PATH = '../../model_weights/RESNET_Reg_T1_bestWeights.pth'
         torch.save(model, PATH)
 
         return model, val_acc_history
@@ -295,9 +296,9 @@ class BlurDetection:
         if model_name == "resnet":
             """ Resnet18
             """
-            #model_ft = models.resnet18(pretrained=use_pretrained)
+            model_ft = models.resnet18(pretrained=use_pretrained)
             #model_ft = models.resnet101(pretrained=use_pretrained)
-            model_ft = resnet18(pretrained=use_pretrained)
+            #model_ft = resnet18(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             #model_ft = model_ft.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
             self.set_parameter_requires_grad(model_ft, feature_extract)
