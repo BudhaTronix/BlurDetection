@@ -40,11 +40,11 @@ for subject in output:
         fileName = temp.replace(sigma, "")
         if fileName == subject:
             c = c + 1
-    print(subject, " - ",c)
-    if c<=10:
+    print(subject, " - ", c)
+    if c <= 10:
         no_of_corr = 10 - c
         for file_name in sorted(mainPath.glob("*T1*.nii.gz")):
-            if file_name.name == str(subject)+".nii.gz":
+            if file_name.name == str(subject) + ".nii.gz":
                 for i in range(no_of_corr):
                     print("Starting to corrupt ", file_name.name, "    Iteration Number - ", i, "/", no_of_corr)
                     subject = tio.Subject(image=tio.ScalarImage(file_name))
@@ -54,4 +54,5 @@ for subject in output:
                     transform = tio.Compose(transforms)
                     img = transform(subject["image"][tio.DATA])[1:2, :, :, :]
                     temp = tio.ScalarImage(tensor=img)
-                    temp.save(out_path + str(file_name.name.split(".nii.gz")[0]) + "-" + str(sigma[0]) + '.nii.gz', squeeze=True)
+                    temp.save(out_path + str(file_name.name.split(".nii.gz")[0]) + "-" + str(sigma[0]) + '.nii.gz',
+                              squeeze=True)

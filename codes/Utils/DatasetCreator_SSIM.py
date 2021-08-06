@@ -33,3 +33,4 @@ for reg_fileName in regPath.glob("*.nii.gz"):
             os.rename(regFilePath, Path(regFilePath.parent, tempStr))
 
 f.close()
+6
