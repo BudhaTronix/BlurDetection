@@ -18,6 +18,11 @@ import os
 import copy
 import random
 import threading
+import tempfile
+
+print("Current temp directory:", tempfile.gettempdir())
+tempfile.tempdir = "/home/mukhopad/tmp"
+print("Temp directory after change:", tempfile.gettempdir())
 print("PyTorch Version: ", torch.__version__)
 print("Torchvision Version: ", torchvision.__version__)
 
@@ -29,10 +34,12 @@ torch.backends.cudnn.benchmark = False
 torch.cuda.manual_seed(42)
 global subjects
 subjects = []
+
+
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=6, batch_size=2, num_epochs=100,
-                 device="cuda"):
+    def __init__(self, model_name="resnet", num_classes=6, batch_size=64, num_epochs=100,
+                 device="cuda:5"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -50,32 +57,29 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/SGPU_RESNET_MultiClass_TorchIO_Classification.pth'
+        self.PATH = '../model_weights/RESNET_MultiClass_TorchIO_Classification.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
         TBLOGDIR = "runs/BlurDetection/TorchIO_Classification/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
-
         self.device = device
 
     def initialize_global_var():
         global subjects  # Needed to modify global copy of globvar
         subjects = []
+
     ##############################################################################
     """DATASET CREATION"""
 
     @property
     def datasetCreation(self):
-        #path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
-        path = "/media/hdd_storage/Budha/Dataset/Isotropic"
+        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
+        # path = "/media/hdd_storage/Budha/Dataset/Isotropic"
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
         patch_qlen = patch_per_vol * 4
-        shuffle_dataset = False
-        random_seed = 42
-        batch_size = 64
 
         print("##########Dataset Loader################")
 
@@ -88,14 +92,14 @@ class BlurDetection:
         for file_name in tqdm(sorted(inpPath.glob("*T1*.nii.gz"))):
             file_index.append(file_name)
 
-        no_threads = 1
+        no_threads = 5
 
         chunks = np.array_split(file_index, no_threads)
         i = 0
         thread = []
         for file_batch in chunks:
             i += 1
-            temp_thread = myThread(i, file_batch, "Thread_"+str(i))
+            temp_thread = myThread(i, file_batch, "Thread_" + str(i))
             thread.append(temp_thread)
 
         for thread_no in thread:
@@ -124,7 +128,7 @@ class BlurDetection:
         validation_split = .1
         shuffle_dataset = True
         random_seed = 42
-        batch_size = 32
+        batch_size = self.batch_size
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -150,8 +154,8 @@ class BlurDetection:
         return dataloader
 
     ###################################################################################
-    #os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
-    #os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
+    os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
+    os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
 
     ####################################################################################
 
@@ -193,8 +197,7 @@ class BlurDetection:
                     elif select_orientation == 3:
                         image_batch = image_batch.permute(0, 3, 2, 1)  # Axial
 
-
-                    for i in range(0,len(image_batch[0])):
+                    for i in range(0, len(image_batch[0])):
                         inputs = image_batch[:, i:(i + 1), :, :]
                         optimizer.zero_grad()
 
@@ -223,17 +226,17 @@ class BlurDetection:
 
                             # statistics
                             running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds.cpu() == labels_batch)#.data.to(self.device))
-                            #if (i == 70):
-                                #store = inputs
-                                #store_lable = labels_batch.cpu().numpy()
-                                #store_pred = preds.cpu().numpy()
-                            #self.writer.add_scalar("Loss/train", loss.item(), c)
-                            #c = c+1
+                            running_corrects += torch.sum(preds.cpu() == labels_batch)  # .data.to(self.device))
+                            # if (i == 70):
+                            # store = inputs
+                            # store_lable = labels_batch.cpu().numpy()
+                            # store_pred = preds.cpu().numpy()
+                            # self.writer.add_scalar("Loss/train", loss.item(), c)
+                            # c = c+1
 
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
-                #self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
+                # self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
                 if phase == 0:
                     mode = "Train"
                     self.writer.add_scalar("Loss/Epoch", epoch_loss, epoch)
@@ -241,11 +244,11 @@ class BlurDetection:
                     mode = "Val"
                     self.writer.add_scalar("Loss/val", epoch_loss, epoch)
 
-                    #img_grid = torchvision.utils.make_grid(store,normalize=True)
-                    #temp = img_grid[:1, :, :]
-                    #text = 'Class Expected:' + str(store_lable) + ' \nClass Output:' + str(store_pred)
-                    #print(text)
-                    #self.writer.add_image(text, temp)
+                    # img_grid = torchvision.utils.make_grid(store,normalize=True)
+                    # temp = img_grid[:1, :, :]
+                    # text = 'Class Expected:' + str(store_lable) + ' \nClass Output:' + str(store_pred)
+                    # print(text)
+                    # self.writer.add_image(text, temp)
 
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
@@ -375,12 +378,13 @@ class BlurDetection:
         #########################################################################
 
         # Setup the loss fxn
-        criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        criterion = nn.CrossEntropyLoss()  # - Use this for multiple class
 
         model_ft, hist = self.train_model(model_ft, criterion, optimizer_ft, num_epochs=self.num_epochs,
                                           is_inception=(self.model_name == "inception"))
         self.writer.flush()
         self.writer.close()
+
 
 ###########################################################################
 class myThread(threading.Thread):
@@ -389,26 +393,31 @@ class myThread(threading.Thread):
         self.threadID = threadID
         self.name = name
         self.file_batch = file_batch
+
     def run(self):
         print("\nStarting " + self.name)
         for file_name in sorted(self.file_batch):
-            axis = random.randint(0, 2)
-            #i = random.randint(0, 4.0)
+            # axis = random.randint(0, 2)
+            # i = random.randint(0, 4.0)
             subject = tio.Subject(image=tio.ScalarImage(file_name), label=[0])
-            for i in range(0,6):
-                if(i==0):
+            for i in range(0, 6):
+                if i == 0:
                     s_transformed = subject
                 else:
-                    transforms = [tio.transforms.Ghosting(num_ghosts=10, intensity=0.2*i, axis=axis, restore=0),
-                                  #tio.transforms.RandomMotion(degrees=10.0, translation=1.0,
-                                                              #image_interpolation='linear', num_transforms=i*2)
-                                  ]
-                    moco = tio.Compose(transforms)
-                    s_transformed = moco.apply_transform(subject)
+                    moco = tio.transforms.Ghosting(num_ghosts=10, intensity=i * 0.2, axis=0, restore=0)
+                    s_transformed = moco(subject)
                     s_transformed["label"] = [int(i)]
+                    # transforms = [tio.transforms.Ghosting(num_ghosts=10, intensity=0.2*i, axis=axis, restore=0),
+                    # tio.transforms.RandomMotion(degrees=10.0, translation=1.0,
+                    # image_interpolation='linear', num_transforms=i*2)
+                    # ]
+                    # moco = tio.Compose(transforms)
+                    # s_transformed = moco.apply_transform(subject)
+
                 subjects.append(s_transformed)
-                #print("\nThread : ", self.threadID, "  Count : ", count)
+                # print("\nThread : ", self.threadID, "  Count : ", count)
         print("\nExiting " + self.name)
+
 
 a = BlurDetection()
 a.callFunction()

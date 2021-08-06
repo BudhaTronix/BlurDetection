@@ -1,11 +1,11 @@
-from tqdm import tqdm
+"""from tqdm import tqdm
 from pathlib import Path
 import torchio as tio
 import time
 import numpy as np
 path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
 inpPath = Path(path)
-"""
+
 since = time.time()
 
 
@@ -21,7 +21,7 @@ for file_name in tqdm(sorted(inpPath.glob("*T1*.nii.gz"))):
 print(count)
 time_elapsed = time.time() - since
 print('Single complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-"""
+
 import threading
 import time
 
@@ -71,4 +71,7 @@ class test():
         print('Thread complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
 A = test()
-test.abc("")
+test.abc("")"""
+
+for i in range(0,6):
+    print(i)
