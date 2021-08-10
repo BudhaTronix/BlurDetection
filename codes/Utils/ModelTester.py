@@ -10,19 +10,24 @@ from torch.utils.data.sampler import SubsetRandomSampler
 def datasetCreator(disp):
     path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Regression_TestDataset/"
     inpPath = Path(path)
-    patch_size = (230, 230, 134)
-    patch_per_vol = 1  # n_slices
-    patch_qlen = patch_per_vol * 2
+
     subjects = []
 
-    if (disp): print("Loading Test Dataset.......")
+    if disp: print("Loading Test Dataset.......")
     for file_name in sorted(inpPath.glob("*.nii.gz")):
         subject = tio.Subject(image=tio.ScalarImage(file_name),
                               label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
         subjects.append(subject)
 
     dataset = tio.SubjectsDataset(subjects)
+    dataset = subjecttodataset(dataset)
 
+    return dataset
+
+def subjecttodataset(dataset):
+    patch_size = (230, 230, 134)
+    patch_per_vol = 1  # n_slices
+    patch_qlen = patch_per_vol * 2
     sampler = tio.data.UniformSampler(patch_size)
     dataset = tio.Queue(
         subjects_dataset=dataset,
@@ -42,11 +47,14 @@ def datasetCreator(disp):
 
     return dataset
 
-
-def ModelTest(disp=False, tollerance=0.3):
-    dataset = datasetCreator(disp=disp)
-    device = "cuda:6"
-    PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'
+def ModelTest(disp=False, preCreated=False, dataset="",  tollerance=0.3, model_path= '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'):
+    if preCreated:
+        dataset = subjecttodataset(dataset)
+    else:
+        dataset = datasetCreator(disp=disp)
+    device = "cuda"
+    #PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'
+    PATH = model_path
     model = torch.load(PATH)
     model.eval()
     model.to(device)
@@ -74,20 +82,20 @@ def ModelTest(disp=False, tollerance=0.3):
                 # abs_delta = np.abs(outputs.squeeze() - labels_batch)
                 pct = tollerance
                 max_allow = np.abs(pct * labels_batch.item())
-                if (disp):
+                if disp:
                     print("predicted = %0.4f  actual = %0.4f \
                      delta = %0.4f  max_allow = %0.4f : " % (outputs.item(), \
                                                              labels_batch.item(), abs_delta, max_allow), end="")
                 if abs_delta < max_allow:
-                    if (disp): print("correct")
+                    if disp: print("correct")
                     n_correct += 1
                 else:
-                    if (disp): print("wrong")
+                    if disp: print("wrong")
                     n_wrong += 1
 
         acc = (n_correct * 1.0) / (n_correct + n_wrong)
-        if (disp): print("Batch Accuracy :", acc)
+        if disp: print("Batch Accuracy :", acc)
         count += 1
         overall_acc += acc
-    if (disp): print("\nOverall Accuracy of 5 Subjects:", overall_acc / count)
-    return (overall_acc / count)
+    if disp: print("\nOverall Accuracy of 5 Subjects:", overall_acc / count)
+    return overall_acc / count

@@ -4,12 +4,12 @@ import torchio as tio
 import time
 import numpy as np
 
-from codes.Utils.motion import MotionCorrupter
+from motion import MotionCorrupter
 
 output = []
-path = "/media/hdd_storage/Budha/Dataset/Regression/"
-in_path = "/media/hdd_storage/Budha/Dataset/Isotropic/"
-out_path = "/media/hdd_storage/Budha/Dataset/Regression/"
+path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
+in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
+out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1/"
 
 mainPath = Path(in_path)
 inpPath = Path(path)

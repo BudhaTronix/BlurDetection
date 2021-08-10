@@ -1,24 +1,33 @@
-from __future__ import print_function
 from __future__ import division
-import torchio as tio
+from __future__ import print_function
+
+import copy
+import os
+import random
+import tempfile
+import time
 from datetime import datetime
-from torch.cuda.amp import GradScaler, autocast
-from tqdm import tqdm
 from pathlib import Path
-from torch.utils.data.sampler import SubsetRandomSampler
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
+import torchio as tio
 import torchvision
-from torchvision import datasets, models
+from torch.cuda.amp import autocast
+from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
-import time
-import os
-import copy
-import random
-import threading
-import tempfile
+from torchvision import models
+from tqdm import tqdm
+import sys
+# insert at 1, 0 is the script path (or '' in REPL)
+sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
+#from codes.Utils.pytorchtools import EarlyStopping
+from codes.Utils.ModelTester import ModelTest
+from codes.Utils.pytorchtools import EarlyStopping
+
+# from models.ResNet import resnet18
 
 print("Current temp directory:", tempfile.gettempdir())
 tempfile.tempdir = "/home/mukhopad/tmp"
@@ -26,20 +35,21 @@ print("Temp directory after change:", tempfile.gettempdir())
 print("PyTorch Version: ", torch.__version__)
 print("Torchvision Version: ", torchvision.__version__)
 
+# from pytorch_lightning.callbacks import Callback
 # To make the model deterministic
 torch.manual_seed(42)
 np.random.seed(42)
 torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
-global subjects
-subjects = []
+torch.autograd.set_detect_anomaly(True)
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=6, batch_size=64, num_epochs=100,
-                 device="cuda:5"):
+    def __init__(self, model_name="resnet", num_classes=6, batch_size=128, num_epochs=1000, device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -52,69 +62,86 @@ class BlurDetection:
         # Number of epochs to train for
         self.num_epochs = num_epochs
 
+        # Path of dataset
+        self.path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TIO_Classification_T1/"
+        # self.path = "/media/hdd_storage/Budha/Dataset/Regression/"
+
         # Flag for feature extracting. When False, we finetune the whole model,
         #   when True we only update the reshaped layer params
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../model_weights/RESNET_MultiClass_TorchIO_Classification.pth'
+        self.PATH = '../../model_weights/RESNET18_MultiClass_DataLoader_Classification_T1.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/TorchIO_Classification/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/ClassificationModel_T1_Resnet_SSIM/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
         self.device = device
-
-    def initialize_global_var():
-        global subjects  # Needed to modify global copy of globvar
-        subjects = []
 
     ##############################################################################
     """DATASET CREATION"""
 
     @property
     def datasetCreation(self):
-        path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
-        # path = "/media/hdd_storage/Budha/Dataset/Isotropic"
+        print("\n#################### RETRIEVING INFORMATION ####################")
+        inpPath = Path(self.path)
+        output = []
         patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
-        patch_qlen = patch_per_vol * 4
+        patch_qlen = patch_per_vol * 5
+        val_split = .5
+        shuffle_dataset = False
+        random_seed = 42
+        batch_size = self.batch_size
 
-        print("##########Dataset Loader################")
+        for file_name in sorted(inpPath.glob("*.nii.gz")):
+            temp = str(file_name.name)
+            sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+            fileName = temp.replace(sigma, "")
+            if fileName not in output:
+                output.append(fileName)
+            # if len(output) == 17:
+            #   break
+        print("Total Subjects: ", len(output))
+        test = 5
+        total = len(output) - test
+        val = int(total * val_split)
+        train = total - val
 
-        inpPath = Path(path)
-        print("Loading Dataset and Transforming.......")
-        count = 0
+        print("Subjects in Training: ", train)
+        print("Subjects in Validation: ", val)
+        print("Subjects in Test: ", test)
 
-        since = time.time()
-        file_index = []
-        for file_name in tqdm(sorted(inpPath.glob("*T1*.nii.gz"))):
-            file_index.append(file_name)
+        count = 1
+        train_subjects = []
+        val_subjects = []
+        test_subjects = []
+        print("\n#################### LOADING DATASET ####################")
+        for subject_id in tqdm(output):
+            for file_name in sorted(inpPath.glob(str("*" + subject_id + "*"))):
+                subject = tio.Subject(image=tio.ScalarImage(file_name),
+                                      label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
+                if count <= train:
+                    train_subjects.append(subject)
+                elif train < count <= (train + val):
+                    val_subjects.append(subject)
+                else:
+                    test_subjects.append(subject)
+            count += 1
 
-        no_threads = 5
+        print("Total files in Training: ", len(train_subjects))
+        print("Total files in Validation: ", len(val_subjects))
+        print("Total files in Testing: ", len(test_subjects))
 
-        chunks = np.array_split(file_index, no_threads)
-        i = 0
-        thread = []
-        for file_batch in chunks:
-            i += 1
-            temp_thread = myThread(i, file_batch, "Thread_" + str(i))
-            thread.append(temp_thread)
+        train_dataset = tio.SubjectsDataset(train_subjects)
+        val_dataset = tio.SubjectsDataset(val_subjects)
+        test_dataset = tio.SubjectsDataset(test_subjects)
 
-        for thread_no in thread:
-            thread_no.start()
-
-        for thread_no in thread:
-            thread_no.join()
-
-        time_elapsed = time.time() - since
-        print('Thread complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-
-        dataset = tio.SubjectsDataset(subjects)
         sampler = tio.data.UniformSampler(patch_size)
-        dataset = tio.Queue(
-            subjects_dataset=dataset,
+        train_dataset = tio.Queue(
+            subjects_dataset=train_dataset,
             max_length=patch_qlen,
             samples_per_volume=patch_per_vol,
             sampler=sampler,
@@ -122,36 +149,40 @@ class BlurDetection:
             # start_background=True
         )
 
-        print('Number of subjects in T1 dataset:', len(dataset))
-        print("########################################\n\n")
+        val_dataset = tio.Queue(
+            subjects_dataset=val_dataset,
+            max_length=patch_qlen,
+            samples_per_volume=patch_per_vol,
+            sampler=sampler,
+            num_workers=0,
+            # start_background=True
+        )
 
-        validation_split = .1
-        shuffle_dataset = True
-        random_seed = 42
-        batch_size = self.batch_size
-        # Creating data indices for training and validation splits:
-        dataset_size = len(dataset)
-        indices = list(range(dataset_size))
-        split = int(np.floor(validation_split * dataset_size))
+        train_dataset_size = len(train_dataset)
+        val_dataset_size = len(val_dataset)
+
+        train_indices = list(range(train_dataset_size))
+        val_indices = list(range(val_dataset_size))
+
         if shuffle_dataset:
             np.random.seed(random_seed)
-            np.random.shuffle(indices)
-        train_indices, val_indices = indices[split:], indices[:split]
+            np.random.shuffle(train_indices)
+            np.random.shuffle(val_indices)
 
-        # Creating PT data samplers and loaders:
         train_sampler = SubsetRandomSampler(train_indices)
         valid_sampler = SubsetRandomSampler(val_indices)
 
-        train = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                            sampler=train_sampler)
-        val = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                          sampler=valid_sampler)
+        train = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                            sampler=train_sampler, num_workers=0)
+        val = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
+                                          sampler=valid_sampler, num_workers=0)
+
         dataloader = []
 
         dataloader.append(train)
         dataloader.append(val)
 
-        return dataloader
+        return dataloader, test_dataset
 
     ###################################################################################
     os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
@@ -159,19 +190,23 @@ class BlurDetection:
 
     ####################################################################################
 
-    def train_model(self, model, criterion, optimizer, num_epochs=10, is_inception=False):
+    def train_model(self, model, dataloaders, criterion, optimizer, num_epochs=10, is_inception=False):
+        print("\n#################### MODEL - TRAIN & VALIDATION ####################")
+        # initialize the early_stopping object
+        patience = 20
+        early_stopping = EarlyStopping(patience=patience, verbose=True)
+
         since = time.time()
         val_acc_history = []
-
+        train_loss_history = []
+        # model = torch.nn.DataParallel(model, device_ids=[6, 5])
+        precision = 5
         best_model_wts = copy.deepcopy(model.state_dict())
         best_acc = 0.0
-
+        best_val_loss = 100000.0
         for epoch in range(num_epochs):
-            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('Epoch {}/{}'.format(epoch, num_epochs))
             print('-' * 10)
-            dataloaders = self.datasetCreation
-            global subjects
-            subjects = []
             # Each epoch has a training and validation phase
             for phase in [0, 1]:
                 if phase == 0:
@@ -184,11 +219,11 @@ class BlurDetection:
                 running_loss = 0.0
                 running_corrects = 0
                 counter = 0
-                c = 0
                 # Iterate over data.
                 for batch in tqdm(dataloaders[phase]):
-                    image_batch = batch["image"][tio.DATA].permute(1, 0, 2, 3, 4).squeeze(0)
+                    image_batch = batch["image"][tio.DATA].squeeze(1)
                     labels_batch = batch["label"][0]
+
                     select_orientation = random.randint(1, 3)
                     if select_orientation == 1:
                         image_batch = image_batch  # Coronal
@@ -198,75 +233,73 @@ class BlurDetection:
                         image_batch = image_batch.permute(0, 3, 2, 1)  # Axial
 
                     for i in range(0, len(image_batch[0])):
-                        inputs = image_batch[:, i:(i + 1), :, :]
+                        inputs = image_batch[:, i:(i + 1), :, :].float()
                         optimizer.zero_grad()
-
                         # forward
                         with torch.set_grad_enabled(phase == 0):
                             if is_inception and phase == 0:
                                 # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
                                 outputs, aux_outputs = model(inputs)
-                                loss1 = criterion(outputs, labels)
-                                loss2 = criterion(aux_outputs, labels)
+                                loss1 = criterion(outputs, labels_batch.unsqueeze(1).float().to(self.device))
+                                loss2 = criterion(aux_outputs, labels_batch.unsqueeze(1).float().to(self.device))
                                 loss = loss1 + 0.4 * loss2
                             else:
                                 with autocast(enabled=True):
+                                    # inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())  #Min Max normalization
                                     inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                     outputs = model(inputs.to(self.device))
-                                    # print(outputs, "  ", torch.argmax(labels.to(self.device), 1).to(self.device))
-                                    loss = criterion(outputs, labels_batch.to(self.device))
+                                    loss = criterion(outputs, labels_batch.long().to(self.device))
                                     counter = counter + 1
 
                             _, preds = torch.max(outputs, 1)
-
                             # backward + optimize only if in training phase
                             if phase == 0:
                                 loss.backward()
                                 optimizer.step()
 
                             # statistics
-                            running_loss += loss.item()  # * batch_img.shape[0]
-                            running_corrects += torch.sum(preds.cpu() == labels_batch)  # .data.to(self.device))
-                            # if (i == 70):
-                            # store = inputs
-                            # store_lable = labels_batch.cpu().numpy()
-                            # store_pred = preds.cpu().numpy()
-                            # self.writer.add_scalar("Loss/train", loss.item(), c)
-                            # c = c+1
+                            running_loss += loss.item() #* len(image_batch)
+                            running_corrects += torch.sum(preds.cpu() == labels_batch.float())
 
                 epoch_loss = running_loss / counter
                 epoch_acc = running_corrects.double() / counter
-                # self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
+
+                self.writer.add_scalar("Acc/Epoch", epoch_acc, epoch)
                 if phase == 0:
                     mode = "Train"
                     self.writer.add_scalar("Loss/Epoch", epoch_loss, epoch)
+                    epoch_loss = round(epoch_loss, precision)
+                    # train_loss_history.append(epoch_loss)
                 else:
                     mode = "Val"
                     self.writer.add_scalar("Loss/val", epoch_loss, epoch)
 
-                    # img_grid = torchvision.utils.make_grid(store,normalize=True)
-                    # temp = img_grid[:1, :, :]
-                    # text = 'Class Expected:' + str(store_lable) + ' \nClass Output:' + str(store_pred)
-                    # print(text)
-                    # self.writer.add_image(text, temp)
+                    #early_stopping(epoch_loss, model)
+                    #if early_stopping.early_stop:
+                    #    print("Early stopping")
+                    #    break
 
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
 
                 # deep copy the model
-                if phase == '1' and epoch_acc > best_acc:
-                    best_acc = epoch_acc
+                if phase == 1 and (epoch_acc.item() >= best_acc or epoch_loss < best_val_loss):
+                    print("Saving the best model weights")
+                    best_acc = epoch_acc.item()
                     best_model_wts = copy.deepcopy(model.state_dict())
-                if phase == '1':
-                    val_acc_history.append(epoch_acc)
-            torch.save(model, self.PATH)
+                # if phase == 1:
+                # val_acc_history.append(epoch_acc.data)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
         print('Best val Acc: {:4f}'.format(best_acc))
+        print("Saving the model")
+        torch.save(model, self.PATH)
 
         # load best model weights
         model.load_state_dict(best_model_wts)
-        torch.save(model, self.PATH)
+        PATH = '../../model_weights/RESNET_Classification_T1_bestWeights.pth'
+        torch.save(model, PATH)
+
         return model, val_acc_history
 
     #################################################################################
@@ -285,10 +318,12 @@ class BlurDetection:
         if model_name == "resnet":
             """ Resnet18
             """
-            model_ft = models.resnet101(pretrained=use_pretrained)
+            model_ft = models.resnet18(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+            # model_ft = model_ft.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
             self.set_parameter_requires_grad(model_ft, feature_extract)
             num_ftrs = model_ft.fc.in_features
+            print(num_ftrs, num_classes)
             model_ft.fc = nn.Linear(num_ftrs, num_classes)
             input_size = 224
 
@@ -374,64 +409,24 @@ class BlurDetection:
                     print("\t", name)
 
         # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.0001, momentum=0.9)
+        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9, nesterov=True)
         #########################################################################
 
         # Setup the loss fxn
-        criterion = nn.CrossEntropyLoss()  # - Use this for multiple class
+        criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        # criterion = nn.BCEWithLogitsLoss()
+        # criterion = nn.L1Loss()
+        # criterion = nn.MSELoss()
 
-        model_ft, hist = self.train_model(model_ft, criterion, optimizer_ft, num_epochs=self.num_epochs,
+        # Train and evaluate
+        dataloader, testSet = self.datasetCreation
+        model_ft, hist = self.train_model(model_ft, dataloader, criterion, optimizer_ft, num_epochs=self.num_epochs,
                                           is_inception=(self.model_name == "inception"))
+        acc = ModelTest(disp=True, preCreated=True, dataset=testSet, model_path=self.PATH)
+        print("Test Accuracy on 5 Subjects : ", acc)
         self.writer.flush()
         self.writer.close()
 
 
-###########################################################################
-class myThread(threading.Thread):
-    def __init__(self, threadID, file_batch, name):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.file_batch = file_batch
-
-    def run(self):
-        print("\nStarting " + self.name)
-        for file_name in sorted(self.file_batch):
-            # axis = random.randint(0, 2)
-            # i = random.randint(0, 4.0)
-            subject = tio.Subject(image=tio.ScalarImage(file_name), label=[0])
-            for i in range(0, 6):
-                if i == 0:
-                    s_transformed = subject
-                else:
-                    moco = tio.transforms.Ghosting(num_ghosts=10, intensity=i * 0.2, axis=0, restore=0)
-                    s_transformed = moco(subject)
-                    s_transformed["label"] = [int(i)]
-                    # transforms = [tio.transforms.Ghosting(num_ghosts=10, intensity=0.2*i, axis=axis, restore=0),
-                    # tio.transforms.RandomMotion(degrees=10.0, translation=1.0,
-                    # image_interpolation='linear', num_transforms=i*2)
-                    # ]
-                    # moco = tio.Compose(transforms)
-                    # s_transformed = moco.apply_transform(subject)
-
-                subjects.append(s_transformed)
-                # print("\nThread : ", self.threadID, "  Count : ", count)
-        print("\nExiting " + self.name)
-
-
 a = BlurDetection()
 a.callFunction()
-"""
-i = random.randint(0, 4.0)
-transform = tio.Compose([
-	tio.transforms.RandomMotion(degrees = 0,
-								translation= 10,
-								num_transforms = 15,
-								image_interpolation= 'linear'),
-	tio.transforms.RandomGhosting(num_ghosts = (15, 15),
-								axes = (0, 1, 2),
-								intensity = (0.5, 1),
-								restore = 0.02)
-	])
-
-"""

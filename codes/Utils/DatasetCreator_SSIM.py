@@ -3,11 +3,12 @@ import torchio as tio
 from pathlib import Path
 import os
 
-path_reg = "/media/hdd_storage/Budha/Dataset/reg_2/"
-path_main = "/media/hdd_storage/Budha/Dataset/Isotropic/"
+path_main = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
+path_reg = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM/"
+
 regPath = Path(path_reg)
 mainPath = Path(path_main)
-f = open("details.txt", "w+")
+f = open("details_2.txt", "w+")
 f.write("Filename,Sigma,SSIM\r\n")
 for reg_fileName in regPath.glob("*.nii.gz"):
     regFilePath = reg_fileName
@@ -25,12 +26,9 @@ for reg_fileName in regPath.glob("*.nii.gz"):
             P = (P - P.min()) / (P.max() - P.min())
             ssim = ski.structural_similarity(GT.numpy(), P.numpy())
             tempStr = str(reg_fileName + "-" + str(ssim) + ".nii.gz")
-            print(regFilePath.name)
-            print(tempStr)
             temp = str(reg_fileName) + "," + str(si) + "," + str(ssim) + "\r\n"
+            print(temp)
             f.write(temp)
-
             os.rename(regFilePath, Path(regFilePath.parent, tempStr))
 
 f.close()
-6
