@@ -6,7 +6,6 @@ import os
 import random
 import tempfile
 import time
-import matplotlib.pyplot as plt
 from datetime import datetime
 from pathlib import Path
 
@@ -16,16 +15,15 @@ import torch.nn as nn
 import torch.optim as optim
 import torchio as tio
 import torchvision
-from torch.cuda.amp import autocast
+from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 from tqdm import tqdm
 import sys
-
 # insert at 1, 0 is the script path (or '' in REPL)
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
-# from codes.Utils.pytorchtools import EarlyStopping
+#from codes.Utils.pytorchtools import EarlyStopping
 from codes.Utils.ModelTester import ModelTest
 from codes.Utils.pytorchtools import EarlyStopping
 
@@ -46,7 +44,7 @@ torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
 torch.autograd.set_detect_anomaly(True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
 ##############################################################################
@@ -77,7 +75,7 @@ class BlurDetection:
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/Training/Regression_T1_RESNET_SSIM/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/TIO_Regression_T1_RESNET_SSIM/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
         self.device = device
@@ -196,9 +194,8 @@ class BlurDetection:
         print("\n#################### MODEL - TRAIN & VALIDATION ####################")
         # initialize the early_stopping object
         patience = 20
-        disp = False
         early_stopping = EarlyStopping(patience=patience, verbose=True)
-
+        scaler = GradScaler()
         since = time.time()
         val_acc_history = []
         train_loss_history = []
@@ -237,39 +234,12 @@ class BlurDetection:
                         elif select_orientation == 3:
                             image_batch = image_batch.permute(0, 3, 2, 1)  # Axial
 
-                        MainImg = None
-                        for i in range(0, len(image_batch)):
-                            temp = None
-                            for j in range(0, len(image_batch[0])):
-                                indx = np.arange(len(image_batch[0]))
-                                np.random.shuffle(indx)
-                                if j == 0:
-                                    temp = image_batch[i, indx[j], :, :].unsqueeze(0)
-                                else:
-                                    temp = torch.cat((temp, image_batch[i, indx[j], :, :].unsqueeze(0)))
-                            if i == 0:
-                                MainImg = temp.unsqueeze(0)
-                            else:
-                                MainImg = torch.cat((MainImg, temp.unsqueeze(0)))
-
-                        image_batch = MainImg
+                        # Shuffle the batch images
                         for i in range(0, len(image_batch[0])):
                             inputs = image_batch[:, i:(i + 1), :, :].float()
-
-                            if disp:
-                                epi_img_data = inputs
-                                slices = []
-                                for i in range(0, len(image_batch)):
-                                    slices.append(epi_img_data[i, :, :, :])
-                                fig, axes = plt.subplots(1, len(slices))
-                                for j, slice in enumerate(slices):
-                                    axes[j].imshow(slice.T, cmap="gray", origin="lower")
-                                plt.suptitle("Labels: " + str(labels_batch))
-                                plt.show()
-                            """
-                                Need to write a function to return the label of each image.
-                            """
                             optimizer.zero_grad()
+                            # inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())  #Min Max normalization
+                            inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                             # forward
                             with torch.set_grad_enabled(phase == 0):
                                 if is_inception and phase == 0:
@@ -280,15 +250,15 @@ class BlurDetection:
                                     loss = loss1 + 0.4 * loss2
                                 else:
                                     with autocast(enabled=True):
-                                        # inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())  #Min Max normalization
-                                        inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                         outputs = model(inputs.to(self.device))
                                         loss = criterion(outputs, labels_batch.unsqueeze(1).float().to(self.device))
                                         counter = counter + 1
 
+
+
                                 # backward + optimize only if in training phase
                                 if phase == 0:
-                                    loss.backward()
+                                    scaler.scale(loss).backward()
                                     optimizer.step()
 
                                 # statistics

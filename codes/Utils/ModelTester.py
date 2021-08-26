@@ -24,6 +24,7 @@ def datasetCreator(disp):
 
     return dataset
 
+
 def subjecttodataset(dataset):
     patch_size = (230, 230, 134)
     patch_per_vol = 1  # n_slices
@@ -47,13 +48,15 @@ def subjecttodataset(dataset):
 
     return dataset
 
-def ModelTest(disp=False, preCreated=False, dataset="",  tollerance=0.3, model_path= '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'):
+
+def ModelTest(disp=False, preCreated=False, dataset="", tollerance=0.3,
+              model_path='../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'):
     if preCreated:
         dataset = subjecttodataset(dataset)
     else:
         dataset = datasetCreator(disp=disp)
     device = "cuda"
-    #PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'
+    # PATH = '../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'
     PATH = model_path
     model = torch.load(PATH)
     model.eval()

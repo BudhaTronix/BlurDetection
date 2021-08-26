@@ -44,7 +44,7 @@ torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
 torch.autograd.set_detect_anomaly(True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 
 
 ##############################################################################
@@ -75,7 +75,7 @@ class BlurDetection:
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/Training/ClassificationModel_T1_Resnet_SSIM/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/Classification_T1_RESNET101_SSIM/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
         self.device = device
@@ -318,7 +318,7 @@ class BlurDetection:
         if model_name == "resnet":
             """ Resnet18
             """
-            model_ft = models.resnet18(pretrained=use_pretrained)
+            model_ft = models.resnet101(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             # model_ft = model_ft.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
             self.set_parameter_requires_grad(model_ft, feature_extract)
