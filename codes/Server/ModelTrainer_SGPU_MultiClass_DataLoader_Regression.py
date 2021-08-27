@@ -29,6 +29,9 @@ sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
 from codes.Utils.ModelTester import ModelTest
 from codes.Utils.pytorchtools import EarlyStopping
 
+sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
+import pytorch_ssim
+
 # from models.ResNet import resnet18
 
 print("Current temp directory:", tempfile.gettempdir())
@@ -46,7 +49,7 @@ torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
 torch.autograd.set_detect_anomaly(True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 
 
 ##############################################################################
@@ -89,8 +92,9 @@ class BlurDetection:
     def datasetCreation(self):
         print("\n#################### RETRIEVING INFORMATION ####################")
         inpPath = Path(self.path)
+        main_Path = Path("/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/")
         output = []
-        patch_size = (230, 230, 134)
+        patch_size = (230, 230)
         patch_per_vol = 1  # n_slices
         patch_qlen = patch_per_vol * 5
         val_split = .5
@@ -100,12 +104,12 @@ class BlurDetection:
 
         for file_name in sorted(inpPath.glob("*.nii.gz")):
             temp = str(file_name.name)
-            sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
-            fileName = temp.replace(sigma, "")
+            ssim = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+            fileName = temp.replace(ssim, "")
             if fileName not in output:
                 output.append(fileName)
-            # if len(output) == 17:
-            #   break
+            if len(output) == 1:
+                break
         print("Total Subjects: ", len(output))
         test = 5
         total = len(output) - test
@@ -123,15 +127,28 @@ class BlurDetection:
         print("\n#################### LOADING DATASET ####################")
         for subject_id in tqdm(output):
             for file_name in sorted(inpPath.glob(str("*" + subject_id + "*"))):
-                subject = tio.Subject(image=tio.ScalarImage(file_name),
-                                      label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
-                if count <= train:
-                    train_subjects.append(subject)
-                elif train < count <= (train + val):
-                    val_subjects.append(subject)
-                else:
-                    test_subjects.append(subject)
-            count += 1
+                imgReg = tio.ScalarImage(file_name)[tio.DATA].double()
+                imgOrig = tio.ScalarImage(main_Path / str(subject_id + ".nii.gz"))[tio.DATA].double()
+                if torch.cuda.is_available():
+                    imgReg = imgReg.cuda()
+                    imgOrig = imgOrig.cuda()
+                # ssim = pytorch_ssim.ssim(imgOrig, imgReg)
+                for i in range(0, len(imgReg.squeeze()[0][0])):
+                    # SSIM can be used here
+                    ssim = pytorch_ssim.ssim(imgOrig[:,:,:,i:(i + 1)], imgReg[:,:,:,i:(i + 1)])
+                    subject = tio.Subject(image=tio.ScalarImage(tensor=imgReg[:,:,:,i:(i + 1)]),
+                                          label=ssim.squeeze().cpu().numpy().item())
+                    print(ssim.squeeze().cpu().numpy().item(), count)
+                    if count <= train:
+                        train_subjects.append(subject)
+                    elif train < count <= (train + val):
+                        val_subjects.append(subject)
+                    else:
+                        test_subjects.append(subject)
+                    imgReg = imgReg.cpu()
+                    imgOrig = imgOrig.cpu()
+                print("\n ########################################")
+                count += 1
 
         print("Total files in Training: ", len(train_subjects))
         print("Total files in Validation: ", len(val_subjects))
@@ -140,7 +157,7 @@ class BlurDetection:
         train_dataset = tio.SubjectsDataset(train_subjects)
         val_dataset = tio.SubjectsDataset(val_subjects)
         test_dataset = tio.SubjectsDataset(test_subjects)
-
+        """
         sampler = tio.data.UniformSampler(patch_size)
         train_dataset = tio.Queue(
             subjects_dataset=train_dataset,
@@ -159,7 +176,7 @@ class BlurDetection:
             num_workers=0,
             # start_background=True
         )
-
+        """
         train_dataset_size = len(train_dataset)
         val_dataset_size = len(val_dataset)
 
@@ -179,10 +196,7 @@ class BlurDetection:
         val = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
                                           sampler=valid_sampler, num_workers=0)
 
-        dataloader = []
-
-        dataloader.append(train)
-        dataloader.append(val)
+        dataloader = [train, val]
 
         return dataloader, test_dataset
 
@@ -288,7 +302,7 @@ class BlurDetection:
 
                                 # backward + optimize only if in training phase
                                 if phase == 0:
-                                    loss.backward()
+                                    scaler.scale(loss).backward()
                                     optimizer.step()
 
                                 # statistics
