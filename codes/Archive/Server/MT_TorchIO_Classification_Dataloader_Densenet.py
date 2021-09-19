@@ -6,7 +6,6 @@ import os
 import random
 import tempfile
 import time
-import matplotlib.pyplot as plt
 from datetime import datetime
 from pathlib import Path
 
@@ -29,9 +28,6 @@ sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
 from codes.Utils.ModelTester import ModelTest
 from codes.Utils.pytorchtools import EarlyStopping
 
-sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
-import pytorch_ssim
-
 # from models.ResNet import resnet18
 
 print("Current temp directory:", tempfile.gettempdir())
@@ -50,11 +46,12 @@ torch.cuda.manual_seed(42)
 torch.autograd.set_detect_anomaly(True)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+from models.DenseNet import DenseNet, densenet121
 
 
 ##############################################################################
 class BlurDetection:
-    def __init__(self, model_name="resnet", num_classes=1, batch_size=128, num_epochs=1000, device="cuda"):
+    def __init__(self, model_name="densenet", num_classes=6, batch_size=128, num_epochs=1000, device="cuda"):
         # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
         self.model_name = model_name
 
@@ -68,7 +65,7 @@ class BlurDetection:
         self.num_epochs = num_epochs
 
         # Path of dataset
-        self.path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM/"
+        self.path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TIO_Classification_T1/"
         # self.path = "/media/hdd_storage/Budha/Dataset/Regression/"
 
         # Flag for feature extracting. When False, we finetune the whole model,
@@ -76,11 +73,11 @@ class BlurDetection:
         self.feature_extract = False
 
         # Model Path
-        self.PATH = '../../model_weights/RESNET18_MultiClass_DataLoader_Reg_T1.pth'
+        self.PATH = '../../model_weights/DENSENET_MultiClass_DataLoader_Classification_T1.pth'
 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
 
-        TBLOGDIR = "runs/BlurDetection/Training/Regression_T1_RESNET_SSIM/{}".format(start_time)
+        TBLOGDIR = "runs/BlurDetection/Training/ClassificationModel_T1_DenseNet_SSIM/{}".format(start_time)
         self.writer = SummaryWriter(TBLOGDIR)
 
         self.device = device
@@ -92,9 +89,8 @@ class BlurDetection:
     def datasetCreation(self):
         print("\n#################### RETRIEVING INFORMATION ####################")
         inpPath = Path(self.path)
-        main_Path = Path("/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/")
         output = []
-        patch_size = (230, 230)
+        patch_size = (230, 230, 134)
         patch_per_vol = 1  # n_slices
         patch_qlen = patch_per_vol * 5
         val_split = .5
@@ -104,12 +100,12 @@ class BlurDetection:
 
         for file_name in sorted(inpPath.glob("*.nii.gz")):
             temp = str(file_name.name)
-            ssim = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
-            fileName = temp.replace(ssim, "")
+            sigma = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+            fileName = temp.replace(sigma, "")
             if fileName not in output:
                 output.append(fileName)
-            if len(output) == 1:
-                break
+            # if len(output) == 17:
+            #   break
         print("Total Subjects: ", len(output))
         test = 5
         total = len(output) - test
@@ -127,28 +123,15 @@ class BlurDetection:
         print("\n#################### LOADING DATASET ####################")
         for subject_id in tqdm(output):
             for file_name in sorted(inpPath.glob(str("*" + subject_id + "*"))):
-                imgReg = tio.ScalarImage(file_name)[tio.DATA].double()
-                imgOrig = tio.ScalarImage(main_Path / str(subject_id + ".nii.gz"))[tio.DATA].double()
-                if torch.cuda.is_available():
-                    imgReg = imgReg.cuda()
-                    imgOrig = imgOrig.cuda()
-                # ssim = pytorch_ssim.ssim(imgOrig, imgReg)
-                for i in range(0, len(imgReg.squeeze()[0][0])):
-                    # SSIM can be used here
-                    ssim = pytorch_ssim.ssim(imgOrig[:,:,:,i:(i + 1)], imgReg[:,:,:,i:(i + 1)])
-                    subject = tio.Subject(image=tio.ScalarImage(tensor=imgReg[:,:,:,i:(i + 1)]),
-                                          label=ssim.squeeze().cpu().numpy().item())
-                    print(ssim.squeeze().cpu().numpy().item(), count)
-                    if count <= train:
-                        train_subjects.append(subject)
-                    elif train < count <= (train + val):
-                        val_subjects.append(subject)
-                    else:
-                        test_subjects.append(subject)
-                    imgReg = imgReg.cpu()
-                    imgOrig = imgOrig.cpu()
-                print("\n ########################################")
-                count += 1
+                subject = tio.Subject(image=tio.ScalarImage(file_name),
+                                      label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
+                if count <= train:
+                    train_subjects.append(subject)
+                elif train < count <= (train + val):
+                    val_subjects.append(subject)
+                else:
+                    test_subjects.append(subject)
+            count += 1
 
         print("Total files in Training: ", len(train_subjects))
         print("Total files in Validation: ", len(val_subjects))
@@ -157,7 +140,7 @@ class BlurDetection:
         train_dataset = tio.SubjectsDataset(train_subjects)
         val_dataset = tio.SubjectsDataset(val_subjects)
         test_dataset = tio.SubjectsDataset(test_subjects)
-        """
+
         sampler = tio.data.UniformSampler(patch_size)
         train_dataset = tio.Queue(
             subjects_dataset=train_dataset,
@@ -176,7 +159,7 @@ class BlurDetection:
             num_workers=0,
             # start_background=True
         )
-        """
+
         train_dataset_size = len(train_dataset)
         val_dataset_size = len(val_dataset)
 
@@ -210,7 +193,6 @@ class BlurDetection:
         print("\n#################### MODEL - TRAIN & VALIDATION ####################")
         # initialize the early_stopping object
         patience = 20
-        disp = False
         early_stopping = EarlyStopping(patience=patience, verbose=True)
 
         since = time.time()
@@ -251,38 +233,8 @@ class BlurDetection:
                         elif select_orientation == 3:
                             image_batch = image_batch.permute(0, 3, 2, 1)  # Axial
 
-                        MainImg = None
-                        for i in range(0, len(image_batch)):
-                            temp = None
-                            for j in range(0, len(image_batch[0])):
-                                indx = np.arange(len(image_batch[0]))
-                                np.random.shuffle(indx)
-                                if j == 0:
-                                    temp = image_batch[i, indx[j], :, :].unsqueeze(0)
-                                else:
-                                    temp = torch.cat((temp, image_batch[i, indx[j], :, :].unsqueeze(0)))
-                            if i == 0:
-                                MainImg = temp.unsqueeze(0)
-                            else:
-                                MainImg = torch.cat((MainImg, temp.unsqueeze(0)))
-
-                        image_batch = MainImg
                         for i in range(0, len(image_batch[0])):
                             inputs = image_batch[:, i:(i + 1), :, :].float()
-
-                            if disp:
-                                epi_img_data = inputs
-                                slices = []
-                                for i in range(0, len(image_batch)):
-                                    slices.append(epi_img_data[i, :, :, :])
-                                fig, axes = plt.subplots(1, len(slices))
-                                for j, slice in enumerate(slices):
-                                    axes[j].imshow(slice.T, cmap="gray", origin="lower")
-                                plt.suptitle("Labels: " + str(labels_batch))
-                                plt.show()
-                            """
-                                Need to write a function to return the label of each image.
-                            """
                             optimizer.zero_grad()
                             # forward
                             with torch.set_grad_enabled(phase == 0):
@@ -297,18 +249,19 @@ class BlurDetection:
                                         # inputs = (inputs-inputs.min())/(inputs.max()-inputs.min())  #Min Max normalization
                                         inputs = inputs / np.linalg.norm(inputs)  # Gaussian Normalization
                                         outputs = model(inputs.to(self.device))
-                                        loss = criterion(outputs, labels_batch.unsqueeze(1).float().to(self.device))
+                                        # print(outputs)
+                                        loss = criterion(outputs, labels_batch.long().to(self.device))
                                         counter = counter + 1
 
+                                _, preds = torch.max(outputs, 1)
                                 # backward + optimize only if in training phase
                                 if phase == 0:
-                                    scaler.scale(loss).backward()
+                                    loss.backward()
                                     optimizer.step()
 
                                 # statistics
-                                running_loss += loss.item() * len(image_batch)
-                                running_corrects += torch.sum(
-                                    outputs.cpu().squeeze() == labels_batch.float())  # .data.to(self.device))
+                                running_loss += loss.item()  # * len(image_batch)
+                                running_corrects += torch.sum(preds.cpu() == labels_batch.float())
 
                     epoch_loss = running_loss / counter
                     epoch_acc = running_corrects.double() / counter
@@ -326,9 +279,6 @@ class BlurDetection:
                         early_stopping(epoch_loss, model)
                         if early_stopping.early_stop:
                             print("Early stopping")
-                            print("Saving the best model weights")
-                            best_acc = epoch_acc.item()
-                            best_model_wts = copy.deepcopy(model.state_dict())
                             flag = False
                             break
 
@@ -350,7 +300,7 @@ class BlurDetection:
 
         # load best model weights
         model.load_state_dict(best_model_wts)
-        PATH = '../../model_weights/RESNET_Reg_T1_bestWeights.pth'
+
         torch.save(model, PATH)
 
         return model, val_acc_history
@@ -372,10 +322,7 @@ class BlurDetection:
             """ Resnet18
             """
             model_ft = models.resnet101(pretrained=use_pretrained)
-            # model_ft = models.resnet101(pretrained=use_pretrained)
-            # model_ft = resnet18(pretrained=use_pretrained)
             model_ft.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-            # model_ft = model_ft.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
             self.set_parameter_requires_grad(model_ft, feature_extract)
             num_ftrs = model_ft.fc.in_features
             print(num_ftrs, num_classes)
@@ -412,7 +359,9 @@ class BlurDetection:
         elif model_name == "densenet":
             """ Densenet
             """
-            model_ft = models.densenet121(pretrained=use_pretrained)
+            # model_ft = models.densenet121(pretrained=use_pretrained)
+            model_ft = DenseNet()
+            # model_ft = densenet121(pretrained=True)
             self.set_parameter_requires_grad(model_ft, feature_extract)
             num_ftrs = model_ft.classifier.in_features
             model_ft.classifier = nn.Linear(num_ftrs, num_classes)
@@ -468,10 +417,10 @@ class BlurDetection:
         #########################################################################
 
         # Setup the loss fxn
-        # criterion = nn.CrossEntropyLoss() #- Use this for multiple class
+        criterion = nn.CrossEntropyLoss()  # - Use this for multiple class
         # criterion = nn.BCEWithLogitsLoss()
         # criterion = nn.L1Loss()
-        criterion = nn.MSELoss()
+        # criterion = nn.MSELoss()
 
         # Train and evaluate
         dataloader, testSet = self.datasetCreation

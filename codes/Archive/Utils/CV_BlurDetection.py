@@ -50,8 +50,8 @@ image_name = "../images/4.jpg" #sys.argv[1]  # "3.jpg"
 threshold_lap = 10
 img = Image.open(image_name)
 imgOrig_copy = img.copy()
-tick = Image.open("../../images/tick.png")
-cross = Image.open("../../images/wrong.png")
+tick = Image.open("../../../images/tick.png")
+cross = Image.open("../../../images/wrong.png")
 
 orig = cv2.imread(image_name)
 orig = imutils.resize(orig, width=500)

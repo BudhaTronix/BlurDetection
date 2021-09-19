@@ -8,7 +8,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 
 def datasetCreator(disp):
-    path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Regression_TestDataset/"
+    path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM/"
     inpPath = Path(path)
 
     subjects = []
@@ -18,7 +18,7 @@ def datasetCreator(disp):
         subject = tio.Subject(image=tio.ScalarImage(file_name),
                               label=[float(str(file_name.name).split(".nii.gz")[0].split("-")[-1])])
         subjects.append(subject)
-
+        break
     dataset = tio.SubjectsDataset(subjects)
     dataset = subjecttodataset(dataset)
 
@@ -50,7 +50,7 @@ def subjecttodataset(dataset):
 
 
 def ModelTest(disp=False, preCreated=False, dataset="", tollerance=0.3,
-              model_path='../model_weights/BlurDetection_ModelWeights_SinlgeGPU_RESNET_MultiClass_DataLoader_Reg_T1.pth'):
+              model_path='/project/mukhopad/tmp/BlurDetection_tmp/model_weights/RESNET101_DataLoader_Reg_T1.pth'):
     if preCreated:
         dataset = subjecttodataset(dataset)
     else:
@@ -102,3 +102,5 @@ def ModelTest(disp=False, preCreated=False, dataset="", tollerance=0.3,
         overall_acc += acc
     if disp: print("\nOverall Accuracy of 5 Subjects:", overall_acc / count)
     return overall_acc / count
+
+ModelTest()
