@@ -24,8 +24,8 @@ import sys
 # insert at 1, 0 is the script path (or '' in REPL)
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
 #from codes.Utils.pytorchtools import EarlyStopping
-from codes.Utils.ModelTester import ModelTest
-from codes.Utils.pytorchtools import EarlyStopping
+from codes.Archive.Utils.ModelTester import ModelTest
+from codes.Archive.Utils.pytorchtools import EarlyStopping
 
 # from models.ResNet import resnet18
 

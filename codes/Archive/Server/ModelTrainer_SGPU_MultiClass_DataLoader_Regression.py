@@ -25,8 +25,6 @@ import sys
 
 # insert at 1, 0 is the script path (or '' in REPL)
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
-from codes.Utils.ModelTester import ModelTest
-from codes.Utils.pytorchtools import EarlyStopping
 
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
 import pytorch_ssim

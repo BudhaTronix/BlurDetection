@@ -11,7 +11,7 @@ from torch.utils.data import SubsetRandomSampler
 from torchvision import models
 from tqdm import tqdm
 
-from train import trainModel
+from Train import trainModel
 
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
 from CSVGenerator import GenerateCSV
@@ -19,7 +19,7 @@ from Dataloader import CustomDataset
 from Test import testModel
 
 # GPU Setup
-device_id = 6
+device_id = 5
 os.environ["CUDA_VISIBLE_DEVICES"] = str(device_id)
 device = "cuda"
 
@@ -43,6 +43,7 @@ modelPath_bestweights = '../../model_weights/RESNET101_bestWeights.pth'
 
 # Configuration
 val_split = 0.3
+tolerance = 0.05
 shuffle_dataset = True
 random_seed = 42
 plot = False
@@ -53,75 +54,89 @@ log = True  # Make it true to log in Tensorboard
 writer = ""
 l = w = []
 transformation = False  # False - Custom transformation, True - Automatic
-transfrom_val = (1,230,230)  # Set this value if you want custom transformation
+transfrom_val = (1, 230, 230)  # Set this value if you want custom transformation
 
 print(" Tensorboard Logging : ", log)
 print(" Validation Split    : ", val_split * 100, "%")
 
-# Check for csv File
-if not os.path.isfile(dataset_Path + csv_FileName):
-    print(" CSV File missing..\nGenerating new CVS File..")
-    GenerateCSV(datasetPath=dataset_Path, csv_FileName=csv_FileName)
-    print(" CSV File Created!")
-else:
-    print("\n Dataset file available")
 
-# Get Transformation Vales
-if transformation:
-    print("\n Scanning Dataset to get transformation values")
-    inpPath = Path(dataset_Path)
-    for file_name in tqdm(sorted(inpPath.glob("*.nii.gz"))):
-        imgReg = tio.ScalarImage(file_name)[tio.DATA].permute(0, 3, 1, 2)
-        l.append(len(imgReg.squeeze()))
-        w.append(len(imgReg.squeeze()[0]))
+def checkCSV():
+    # Check for csv File
+    if not os.path.isfile(dataset_Path + csv_FileName):
+        print(" CSV File missing..\nGenerating new CVS File..")
+        GenerateCSV(datasetPath=dataset_Path, csv_FileName=csv_FileName)
+        print(" CSV File Created!")
+    else:
+        print("\n Dataset file available")
 
-    transform = tio.CropOrPad((1, int(np.median(np.sort(np.array(l)))), int(np.median(np.sort(np.array(w))))))
-    print(" Transformation Values are : ",
-          str((1, int(np.median(np.sort(np.array(l)))), int(np.median(np.sort(np.array(w)))))))
-else:
-    print(" Custom Transformation Values : ", transfrom_val)
-    transform = tio.CropOrPad(transfrom_val)
+def getTransformation():
+    # Get Transformation Vales
+    if transformation:
+        print("\n Scanning Dataset to get transformation values")
+        inpPath = Path(dataset_Path)
+        for file_name in tqdm(sorted(inpPath.glob("*.nii.gz"))):
+            imgReg = tio.ScalarImage(file_name)[tio.DATA].permute(0, 3, 1, 2)
+            l.append(len(imgReg.squeeze()))
+            w.append(len(imgReg.squeeze()[0]))
 
-# Load dataset
-dataset = CustomDataset(dataset_path=dataset_Path, csv_file=dataset_Path + csv_FileName, transform=transform)
-print(" Dataset loaded")
-
-# Creating data indices for training and validation splits:
-dataset_size = len(dataset)
-indices = list(range(dataset_size))
-split = int(np.floor(val_split * dataset_size))
-if shuffle_dataset:
-    np.random.seed(random_seed)
-    np.random.shuffle(indices)
-train_indices, val_indices = indices[split:], indices[:split]
-
-# Creating PT data samplers and loaders:
-train_sampler = SubsetRandomSampler(train_indices)
-valid_sampler = SubsetRandomSampler(val_indices)
-
-train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                           sampler=train_sampler)
-validation_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                                sampler=valid_sampler)
-dataloader = [train_loader, validation_loader]
-
-# Train and Validate
-print("\n Model Training Started..")
-trainModel(modelPath=modelPath, dataloaders=dataloader, modelPath_bestweight=modelPath_bestweights,
-           num_epochs=num_epochs, model=model,
-           criterion=criterion, optimizer=optimizer, log=log)
+        transform = tio.CropOrPad((1, int(np.median(np.sort(np.array(l)))), int(np.median(np.sort(np.array(w))))))
+        print(" Transformation Values are : ",
+              str((1, int(np.median(np.sort(np.array(l)))), int(np.median(np.sort(np.array(w)))))))
+    else:
+        print(" Custom Transformation Values : ", transfrom_val)
+        transform = tio.CropOrPad(transfrom_val)
+    return transform
 
 
-# Load Test Data
-print("\n Loading Test Data")
-GenerateCSV(datasetPath=test_dataset_Path, csv_FileName=csv_FileName)
-dataset = CustomDataset(dataset_path=test_dataset_Path, csv_file=dataset_Path + csv_FileName, transform=transform)
-test_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, log=log)
+def getDataloader_train():
+    # Load dataset
+    transform = getTransformation()
+    dataset = CustomDataset(dataset_path=dataset_Path, csv_file=dataset_Path + csv_FileName, transform=transform)
+    print(" Dataset loaded")
 
-# Test Model with saved weights
-print("Testing model with saved weights")
-testModel(model, test_loader, modelPath,)
+    # Creating data indices for training and validation splits:
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(val_split * dataset_size))
+    if shuffle_dataset:
+        np.random.seed(random_seed)
+        np.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
 
-# Test Model with best weights
-print("Testing model with best weights")
-testModel(model, test_loader, modelPath_bestweights)
+    # Creating PT data samplers and loaders:
+    train_sampler = SubsetRandomSampler(train_indices)
+    valid_sampler = SubsetRandomSampler(val_indices)
+
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                               sampler=train_sampler)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                                    sampler=valid_sampler)
+    dataloader = [train_loader, validation_loader]
+    return dataloader
+
+
+def train():
+    # Train and Validate
+    dataloader = getDataloader_train()
+    print("\n Model Training Started..")
+    trainModel(modelPath=modelPath, dataloaders=dataloader, modelPath_bestweight=modelPath_bestweights,
+               num_epochs=num_epochs, model=model,
+               criterion=criterion, optimizer=optimizer, log=log)
+
+
+def test():
+    # Load Test Data
+    print("\n Loading Test Data")
+    transform = getTransformation()
+    GenerateCSV(datasetPath=test_dataset_Path, csv_FileName=csv_FileName)  # Generate the csv file for test data
+    dataset = CustomDataset(dataset_path=test_dataset_Path, csv_file=test_dataset_Path + csv_FileName,
+                            transform=transform)
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size=1)
+
+    # Test Model with saved weights
+    print("Testing model with saved weights")
+    testModel(dataloaders=test_loader, modelPath=modelPath, tol=tolerance, debug=debug)
+
+    # Test Model with best weights
+    print("Testing model with best weights")
+    testModel(dataloaders=test_loader, modelPath=modelPath_bestweights, tol=tolerance, debug=debug)

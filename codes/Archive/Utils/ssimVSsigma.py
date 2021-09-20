@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import iqr
 
-data = pd.read_csv("data.csv")
+data = pd.read_csv("../data.csv")
 # Preview the first 5 lines of the loaded data
 fig, ax = plt.subplots()
 ax.set(title="SSIM vs Sigma value graph",

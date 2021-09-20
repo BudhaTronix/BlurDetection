@@ -40,7 +40,7 @@ scaler = GradScaler()
 # train_loss_history = []
 precision = 1
 flag = True
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 device = "cuda"
 
 
@@ -49,7 +49,7 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model, 
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
         TBLOGDIR = "runs/BlurDetection/Training/RenseNet101_SSIM/{}".format(start_time)
         writer = SummaryWriter(TBLOGDIR)
-
+    best_model_wts = ""
     best_acc = 0.0
     best_val_loss = 99999
     since = time.time()
@@ -118,6 +118,14 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model, 
                 best_acc = epoch_acc.item()
                 best_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
+
+        if epoch % 10 == 0:
+            print("Saving the model")
+            # save the model
+            torch.save(model, modelPath)
+            # load best model weights
+            model.load_state_dict(best_model_wts)
+            torch.save(model, modelPath_bestweight)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
