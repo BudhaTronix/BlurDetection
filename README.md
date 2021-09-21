@@ -7,3 +7,8 @@ Ranges for motion corruption:
 	sigma : 0.01 - 0.2
 	mu    : 0.0
 Model: 2D Resnet101
+
+
+# How to run the code
+
+# Dataset creation 
