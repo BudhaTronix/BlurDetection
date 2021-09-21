@@ -57,7 +57,7 @@ def datasetCreator_classification(in_path, out_path):
             temp.save(out_path + str(name.split(".nii.gz")[0]) + "-" + str(i) + '.nii.gz', squeeze=True)
 
 
-def datasetCreator_mode2_regression(in_path, out_path):
+def datasetCreator_regression(in_path, out_path):
     in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
     out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1_set2/"
 
@@ -66,8 +66,7 @@ def datasetCreator_mode2_regression(in_path, out_path):
     print("\n Corrupting Dataset....")
     n_threads = 5
     mu = 0.0
-    for i in range(1, 6):
-        #print('Corruption Iteration: ', str(i))
+    for i in range(1, 10):
         for s in tqdm(subjects_dataset):
             name = s["filename"]
             sigma = np.random.uniform(low=0.01, high=0.2, size=(1,))
@@ -80,4 +79,4 @@ def datasetCreator_mode2_regression(in_path, out_path):
 
 
 # datasetCreator_mode2_regression("","")
-datasetCreator_classification("", "")
+# datasetCreator_classification("", "")

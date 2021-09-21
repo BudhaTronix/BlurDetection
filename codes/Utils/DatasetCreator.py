@@ -24,13 +24,12 @@ def disp(imgReg, imgOrig, text):
     plt.suptitle("Labels: " + text)
     plt.show()
 
-
 def RandDatasetCreation(inpPath, mainPath, outPath):
     inpPath = Path(inpPath)
     main_Path = Path(mainPath)
     output = []
     random_seed = 42
-    samples_per_subject = 200
+    samples_per_subject = 40
     random.seed(random_seed)
     buffer = 20
 
@@ -151,7 +150,7 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
             i += 1
 
 
-"""out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Dataset/"
+out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
 main_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
 inp_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM/"
-RandDatasetCreation(inpPath=inp_Path, mainPath=main_Path, outPath=out_path)"""
+RandDatasetCreation(inpPath=inp_Path, mainPath=main_Path, outPath=out_path)
