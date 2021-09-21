@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import torch
 import torchio as tio
 
-
 sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
 import pytorch_ssim
 
@@ -24,6 +23,7 @@ def disp(imgReg, imgOrig, text):
     plt.suptitle("Labels: " + text)
     plt.show()
 
+
 def RandDatasetCreation(inpPath, mainPath, outPath):
     inpPath = Path(inpPath)
     main_Path = Path(mainPath)
@@ -32,27 +32,29 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
     samples_per_subject = 40
     random.seed(random_seed)
     buffer = 20
-
-    for file_name in sorted(main_Path.glob("*T1*.nii.gz")):
-        output.append(file_name.name.replace(".nii.gz", ""))
-
-    with open(outPath + 'result.csv', 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Filename', 'SSIM', 'Axis', 'Counter'])
-
     no_of_retry = 10
     idx = flag = 0
     ctr_1 = ctr_2 = ctr_3 = ctr_4 = retry = 0
     c_1 = c_2 = c_3 = c_4 = []
     q = 0
+    no_files_perSubject = 200
+    csvFileName = 'result.csv'
+
+    for file_name in sorted(main_Path.glob("*T1*.nii.gz")):
+        output.append(file_name.name.replace(".nii.gz", ""))
+
+    with open(outPath + csvFileName, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Filename', 'SSIM', 'Axis', 'Counter'])
+
     while idx < len(output):
         if retry >= no_of_retry:
             l = (ctr_1, ctr_2, ctr_3, ctr_4)
-            print("Subject :",output[idx],"   Values :",ctr_1, ctr_2, ctr_3, ctr_4)
+            print("Subject :", output[idx], "   Values :", ctr_1, ctr_2, ctr_3, ctr_4)
             # get index of smallest item in list
-            X = min(l)
+            X = min(l) # Getting the minimum no of items of each class
             if X == 0:
-                print("Subject Removed")
+                print("Subject Removed")  # Subject is removed if one of the classes have 0 items
             else:
                 c_1 = c_1[0:X]
                 c_2 = c_2[0:X]
@@ -60,7 +62,7 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
                 c_4 = c_4[0:X]
             retry = 0
             idx += 1
-        if ctr_1 == ctr_2 == ctr_3 == ctr_4 == int(samples_per_subject / 4) or flag == 1:
+        if ctr_1 == ctr_2 == ctr_3 == ctr_4 == int(samples_per_subject / 4) or flag == 1:  # Check - all class are equal
             idx += 1
             flag = ctr_1 = ctr_2 = ctr_3 = ctr_4 = retry = 0
             c_1 = c_2 = c_3 = c_4 = []
@@ -68,7 +70,7 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
         else:
             if not q == 0:
                 retry += 1
-                print("Iteration :", retry)
+                print("Iteration :", retry)  # Printing the number of iterations performed
 
         subject_id = output[idx]
         writeFile = []
@@ -85,7 +87,8 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
             imgOrig = (imgOrig - imgOrig.min()) / (imgOrig.max() - imgOrig.min())
 
             ctr = 0
-            while not (ctr_1 == ctr_2 == ctr_3 == ctr_4 == int(samples_per_subject / 4)) and ctr < 200 and retry < no_of_retry:
+            while not (ctr_1 == ctr_2 == ctr_3 == ctr_4 == int(
+                    samples_per_subject / 4)) and ctr < no_files_perSubject and retry < no_of_retry:
                 store = True
                 # Randomly select the axis
                 axis = random.randint(0, 2)
@@ -135,7 +138,7 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
                 if ctr_1 == ctr_2 == ctr_3 == ctr_4 == int(samples_per_subject / 4):
                     flag = 1
 
-        with open(outPath + 'result.csv', 'a') as f:
+        with open(outPath + csvFileName, 'a') as f:
             writer = csv.writer(f)
             writer.writerows(writeFile)
         files = c_1 + c_2 + c_3 + c_4

@@ -114,7 +114,6 @@ def getDataloader_train():
     dataloader = [train_loader, validation_loader]
     return dataloader
 
-
 def train():
     # Train and Validate
     dataloader = getDataloader_train()
