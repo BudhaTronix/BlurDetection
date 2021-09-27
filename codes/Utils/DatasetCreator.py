@@ -28,16 +28,16 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
     inpPath = Path(inpPath)
     main_Path = Path(mainPath)
     output = []
-    random_seed = 42
-    samples_per_subject = 40
+    random_seed = 10
+    samples_per_subject = 100
     random.seed(random_seed)
     buffer = 20
-    no_of_retry = 10
+    no_of_retry = 15
     idx = flag = 0
     ctr_1 = ctr_2 = ctr_3 = ctr_4 = retry = 0
     c_1 = c_2 = c_3 = c_4 = []
     q = 0
-    no_files_perSubject = 200
+    no_files_perSubject = 300
     csvFileName = 'result.csv'
 
     for file_name in sorted(main_Path.glob("*T1*.nii.gz")):
@@ -153,7 +153,7 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
             i += 1
 
 
-out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
+out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Dataset_2/"
 main_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
 inp_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/SSIM/"
 RandDatasetCreation(inpPath=inp_Path, mainPath=main_Path, outPath=out_path)
