@@ -18,7 +18,6 @@ def create_subjectlist(inpPath):
     return subjects
 
 
-
 def datasetCreator_regression(in_path, out_path, no_of_corruption, add_base_image):
     subjects_dataset = create_subjectlist(in_path)
     print("\n Corrupting Dataset....")
@@ -34,8 +33,3 @@ def datasetCreator_regression(in_path, out_path, no_of_corruption, add_base_imag
             img = transform(s["image"][tio.DATA])[1:2, :, :, :]
             temp = tio.ScalarImage(tensor=img)
             temp.save(out_path + str(name.split(".nii.gz")[0]) + "-" + str(sigma[0]) + '.nii.gz', squeeze=True)
-
-"""
-in_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/IsotropicDataset/"
-out_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Iso_Transformed_Regression_T1_set2/"
-"""

@@ -1,16 +1,19 @@
 import itertools
 import os
-import time
+import sys
 import pandas as pd
 import seaborn as sns
-import statistics
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+try:
+    from utils import returnClass
+except ImportError:
+    sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
+    from utils import returnClass
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 device = "cuda"
 
 
@@ -34,21 +37,12 @@ def visualize(pred, label, no_class):
     plt.show()
 
 
-def returnClass(no_of_class, array):
-    class_intervals = 1 / no_of_class
-    array[array == 0] = 0
-    array[array >= 1] = no_of_class - 1
-    for i in range(no_of_class):
-        array[(array >= (class_intervals * i)) & (array < (class_intervals * (i + 1)))] = i
-    return array
-
-
 def plot_confusion_matrix(cm, classes, normalize=True, title='Confusion matrix', cmap=plt.cm.Blues):
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
+        print("Displaying Normalized confusion matrix")
     else:
-        print('Confusion matrix, without normalization')
+        print('Displaying Confusion matrix, without normalization')
 
     # print(cm)
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
@@ -78,7 +72,7 @@ def calMSE(predicted, expected):
         errors.append(err)
     print("Average MSE            : ", np.mean(errors))
     print("Standard deviation     : ", np.std(errors))
-    print("Variance               : ", np.std(errors))
+    print("Variance               : ", np.std(errors), "\n")
 
 
 def calMeanAbsError(expected, predicted):
@@ -86,10 +80,9 @@ def calMeanAbsError(expected, predicted):
     for i in range(len(expected)):
         err = abs((expected[i] - predicted[i]))
         errors.append(err)
-
     print("Average Absolute Error : ", np.mean(errors))
     print("Standard deviation     : ", np.std(errors))
-    print("Variance               : ", np.std(errors))
+    print("Variance               : ", np.std(errors), "\n")
 
 
 def testModel(dataloaders, no_class, modelPath, debug=False):
@@ -99,59 +92,39 @@ def testModel(dataloaders, no_class, modelPath, debug=False):
     model.to(device)
     running_corrects = 0
     batch_c = 0
-
-    """since = time.time()
+    lbl = pred = []
     nb_classes = no_class
     cf = torch.zeros(nb_classes, nb_classes)
     with torch.no_grad():
         for i, (inputs, classes) in enumerate(dataloaders):
             inputs = inputs.unsqueeze(1).float().to(device)
+            inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
             classes = classes.to(device)
             outputs = model(inputs)
-            op_class = returnClass(no_class, outputs)
+            if len(lbl) == 0:
+                lbl = classes.cpu().tolist()
+                pred = outputs.detach().cpu().squeeze().tolist()
+            else:
+                lbl.extend(classes.cpu().tolist())
+                pred.extend(outputs.detach().cpu().squeeze().tolist())
+            op_class = returnClass(no_class, outputs.squeeze())
             lbl_class = returnClass(no_class, classes)
             for t, p in zip(lbl_class, op_class):
                 cf[t.long(), p.long()] += 1
-    cf = cf.detach().cpu().numpy()
-    cf = cf.astype(int)
-    #print(cf)
-    plot_confusion_matrix(cm=cf, classes=no_class)
-    time_elapsed = time.time() - since
-    print("Time taken :", time_elapsed)"""
 
-    # Iterate over data.
-    lbl = pred = []
-    cm = 0
-    with torch.no_grad():
-        for batch in tqdm(dataloaders):
-            image_batch, labels_batch = batch
-            image_batch = image_batch.unsqueeze(1)
-            image_batch = (image_batch - image_batch.min()) / \
-                          (image_batch.max() - image_batch.min())  # Min Max normalization
-            outputs = model(image_batch.float().to(device))
-            output = outputs.detach().cpu().squeeze().tolist()
-            label = labels_batch.tolist()
-            if len(lbl) == 0:
-                lbl = label
-                pred = output
-            else:
-                lbl.extend(label)
-                pred.extend(output)
-            op_class = returnClass(no_class, np.array(output))
-            lbl_class = returnClass(no_class, np.array(label))
-            cm += confusion_matrix(lbl_class, op_class)
-            out = np.sum(op_class == lbl_class)
-            batch_c += len(batch[0])
+            out = np.sum(op_class.cpu().detach().numpy() == lbl_class.cpu().numpy())
+            batch_c += len(inputs)
             running_corrects += out
             if debug:
-                print("Raw Output    : Model OP-> ", output, ", Label-> ", label)
+                print("Raw Output    : Model OP-> ", outputs.detach().cpu().squeeze().tolist(), ", Label-> ",
+                      classes.cpu().tolist())
                 print("Class Output  : Model OP-> ", op_class, ", Label-> ", lbl_class, "\n")
-                print("Accuracy per batch :", float(out / len(batch[0]) * 100), "%")
+                print("Accuracy per batch :", float(out / len(inputs) * 100), "%")
 
-    # Plot Confusion Matrix of class
-    plot_confusion_matrix(cm=cm, classes=no_class)
+    cf = cf.detach().cpu().numpy()
+    cf = cf.astype(int)
+    plot_confusion_matrix(cm=cf, classes=no_class)
 
-    # Print Accuracy on class basis
     total_acc = running_corrects
     print("\nTotal Correct :", total_acc, ", out of :", batch_c)
     print("Accuracy      :", float(total_acc / batch_c * 100), "%\n")
@@ -159,6 +132,5 @@ def testModel(dataloaders, no_class, modelPath, debug=False):
     lbl = np.float32(lbl)
     pred = np.float32(pred)
     calMeanAbsError(predicted=pred, expected=lbl)
-    print()
     calMSE(predicted=pred, expected=lbl)
     visualize(pred, lbl, no_class)
