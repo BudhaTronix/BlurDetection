@@ -134,3 +134,21 @@ def testModel(dataloaders, no_class, modelPath, debug=False):
     calMeanAbsError(predicted=pred, expected=lbl)
     calMSE(predicted=pred, expected=lbl)
     visualize(pred, lbl, no_class)
+
+
+def getModelOP(dataloaders, modelPath, debug=False):
+    print("Model In Testing mode")
+    model = torch.load(modelPath)
+    model.eval()
+    model.to(device)
+
+    with torch.no_grad():
+        for batch in dataloaders:
+            image_batch, labels_batch = batch
+            inputs = image_batch.unsqueeze(1).float().to(device)
+            inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
+            outputs = model(inputs)
+            outputs = outputs.detach().cpu().squeeze().tolist()
+            if debug:
+                for i in range(len(outputs)):
+                    print("FileName: ", labels_batch[i] + " --  Model OP-> ", outputs[i])

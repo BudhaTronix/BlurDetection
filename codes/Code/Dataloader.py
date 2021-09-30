@@ -5,7 +5,7 @@ import torchio as tio
 
 
 class CustomDataset(Dataset):
-    def __init__(self, dataset_path, csv_file, transform):
+    def __init__(self, dataset_path, csv_file, transform, useModel=False):
         """
         Args:
             csv_file (string): csv file name
@@ -26,6 +26,8 @@ class CustomDataset(Dataset):
         self.label_arr = np.asarray(self.data_info.iloc[:, 1])
         # Calculate len
         self.data_len = len(self.data_info.index)
+        # If model is being used then filenames are sent instead of labels
+        self.useModel = useModel
 
     def __getitem__(self, index):
         # Get image name from the pandas df
@@ -34,9 +36,13 @@ class CustomDataset(Dataset):
         img = tio.ScalarImage(self.dataset_path+single_image_name)[tio.DATA].permute(0, 3, 1, 2)
         # Transform image
         img_transformed = self.transform(img).squeeze()
-        # Get label(class) of the image based on the cropped pandas column
-        image_label = self.label_arr[index]
 
+        if not self.useModel:
+            # Get label(class) of the image based on the cropped pandas column
+            image_label = self.label_arr[index]
+
+        else:
+            image_label = single_image_name
         return img_transformed, image_label
 
     def __len__(self):

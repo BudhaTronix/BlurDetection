@@ -50,7 +50,7 @@ class BlurDetection:
         self.num_epochs = 3000
         self.batch_size = 300
         self.debug = True
-        self.log = True  # Make it true to log in Tensorboard
+        self.log = False  # Make it true to log in Tensorboard
 
         self.transformation = False  # False - Custom transformation, True - Automatic
         self.transform_val = (1, 230, 230)  # Set this value if you want custom transformation
