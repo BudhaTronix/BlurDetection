@@ -92,10 +92,11 @@ class TestingScript:
             testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath, debug=False)
 
     def main(self):
-        self.testModelScript_Dataloader_Image(niftyFile=self.filePath)
+        # self.testModelScript_Dataloader_Image(niftyFile=self.filePath)
 
         # Use this function if you have a dataset created
-        # testModelScript_Dataloader(dataset_Path, csv_FileName, modelPath, transform, generateCSV=False)
+
+        self.testModelScript_Dataloader(dataset_Path, csv_FileName, modelPath, transform, generateCSV=False)
 
         # Use this function if you have a dataset created
         # testModelScript_Dataloader_Image(Subject_Name=None, Subject_directory=None, modelPath)

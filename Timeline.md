@@ -209,7 +209,7 @@ multiprocessing.dummy
 
 ### TASKS :
 1. Read about evaluation of regression data - different metrics
-2. Confusion matrix
+2. Confusion matrix 
 3. Check about axis
 4. put back the subject selection during train/val
 5. Update about subject selection - train/val/test
@@ -225,3 +225,7 @@ multiprocessing.dummy
 4. Finish with lightning - can be done later 
 5. Include the T2 images as well in the training and test - Not needed now. Finish with T1 first
 
+### Other Tasks done: 
+1. Training on multiGPU
+2. Documenting the code - in progress
+3. Increase the dataset 
