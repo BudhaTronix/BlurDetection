@@ -1,22 +1,22 @@
 from Pipeline import BlurDetection
+import json
 
 
 def main():
-    dataset_path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Dataset/"
-    test_dataset_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
-    model_Path = '../../model_weights/RESNET101.pth'
-    model_bestweight_Path = '../../model_weights/RESNET101_bestWeights.pth'
-    obj1 = BlurDetection(dataset_path, test_dataset_Path, model_Path, model_bestweight_Path)
-    print(" Tensorboard Logging : ", obj1.log)
-    print(" Validation Split    : ", obj1.val_split * 100, "%")
+    # Define Paths
+    with open('Config.json') as f:
+        data = json.load(f)
+        # Configuration
+        system_to_run = "StudentPC"  # Select between - StudentPC, FCM, GPU18
+        model_selection = 1  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
-    # Define Transformation
-    transform_val = obj1.getTransformation()
+        obj1 = BlurDetection(data, system_to_run, model_selection)
 
-    # Training and Validating Model
-    obj1.trainModel(useSaveWeights=False, transform_val=transform_val)
+        print(" Tensorboard Logging : ", obj1.log)
+        print(" Validation Split    : ", obj1.val_split * 100, "%")
 
-    # Testing Model
-    obj1.test(transform_val)
+        obj1.trainModel()
+        obj1.test()
+
 
 main()

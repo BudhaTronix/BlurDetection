@@ -10,11 +10,8 @@ import torch
 try:
     from utils import returnClass
 except ImportError:
-    sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
+    sys.path.insert(1, '../Utils/')
     from utils import returnClass
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
-device = "cuda"
 
 
 def visualize(pred, label, no_class):
@@ -44,7 +41,6 @@ def plot_confusion_matrix(cm, classes, normalize=True, title='Confusion matrix',
     else:
         print('Displaying Confusion matrix, without normalization')
 
-    # print(cm)
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
     plt.colorbar()
@@ -85,7 +81,7 @@ def calMeanAbsError(expected, predicted):
     print("Variance               : ", np.std(errors), "\n")
 
 
-def testModel(dataloaders, no_class, modelPath, debug=False):
+def testModel(dataloaders, no_class, modelPath, debug=False, device="cuda"):
     print("Model In Testing mode")
     model = torch.load(modelPath)
     model.eval()
@@ -136,12 +132,11 @@ def testModel(dataloaders, no_class, modelPath, debug=False):
     visualize(pred, lbl, no_class)
 
 
-def getModelOP(dataloaders, modelPath, debug=False):
+def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
     print("Model In Testing mode")
     model = torch.load(modelPath)
     model.eval()
     model.to(device)
-
     with torch.no_grad():
         for batch in dataloaders:
             image_batch, labels_batch = batch

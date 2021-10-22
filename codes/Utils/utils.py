@@ -33,13 +33,15 @@ def returnClass(no_of_class, array):
     return array
 
 
-def plot_bar(array, no_of_class):
-    array = returnClass(4, np.array(array))
+def plot_bar(array, no_of_class=4):
+    array = returnClass(no_of_class, np.array(array))
     array = array.astype(int)
     bin_count = np.bincount(array)
-    print(bin_count)
+    print("Bin Count : ", bin_count)
     fig, ax = plt.subplots()
-    langs = ['0', '1', '2', '3']
+    # langs = ['0', '1', '2', '3']
+    langs = [str(x) for x in range(0, no_of_class)]
+    print("Y Tiles   : ", langs)
     bin = bin_count
     ax.set(title="SSIM distribution",
            xlabel="SSIM Classes",
@@ -57,3 +59,16 @@ def disp(imgReg, imgOrig, text):
         axes[j].imshow(slice.T, cmap="gray", origin="lower")
     plt.suptitle("Labels: " + text)
     plt.show()
+
+
+def display_dataset_dist(inpPath, no_of_class=4):
+    for i in range(no_of_class - 1, -1, -1):
+        print(i)
+    inpPath = Path(inpPath)
+    ssims = []
+    for file_name in sorted(inpPath.glob("*.nii.gz")):
+        ssim = float(file_name.name.split(".nii.gz")[0].split("-")[-1])
+        ssims.append(ssim)
+    plot_bar(np.array(ssims), no_of_class=no_of_class)
+
+

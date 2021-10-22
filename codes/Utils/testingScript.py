@@ -95,12 +95,12 @@ class TestingScript:
         # self.testModelScript_Dataloader_Image(niftyFile=self.filePath)
 
         # Use this function if you have a dataset created
-
-        self.testModelScript_Dataloader(dataset_Path, csv_FileName, modelPath, transform, generateCSV=False)
+        self.testModelScript_Dataloader(self.dataset_Path, self.csv_FileName,
+                                        self.modelPath)
 
         # Use this function if you have a dataset created
         # testModelScript_Dataloader_Image(Subject_Name=None, Subject_directory=None, modelPath)
 
 
-# test = TestingScript()
-# test.main()
+test = TestingScript()
+test.main()

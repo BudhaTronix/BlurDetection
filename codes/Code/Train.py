@@ -2,42 +2,18 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
-import sys
-import tempfile
 import time
-
+from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torchvision
-from datetime import datetime
 from torch.cuda.amp import autocast, GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-# insert at 1, 0 is the script path (or '' in REPL)
-# sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/')
-sys.path.insert(1, '/project/mukhopad/tmp/BlurDetection_tmp/codes/Utils/')
-
-print("Current temp directory:", tempfile.gettempdir())
-tempfile.tempdir = "/home/mukhopad/tmp"
-print("Temp directory after change:", tempfile.gettempdir())
-
-print("PyTorch Version: ", torch.__version__)
-print("Torchvision Version: ", torchvision.__version__)
-
-# To make the model deterministic
-torch.manual_seed(42)
-np.random.seed(42)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = True
-torch.cuda.manual_seed(42)
-
 # torch.autograd.set_detect_anomaly(True)
 
 scaler = GradScaler()
-precision = 1
-device = 2
 
 
 def saveImage(images, labels, output):
@@ -55,31 +31,30 @@ def saveImage(images, labels, output):
     return figure
 
 
-def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model, criterion, optimizer, log=False):
+def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
+               criterion, optimizer, log=False, log_dir="runs/", device="cuda"):
+    precision = 1  # Sets the decimal value
     if log:
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
-        TBLOGDIR = "runs/BlurDetection/Training/RenseNet101_SSIM/{}".format(start_time)
+        TBLOGDIR = log_dir.format(start_time)
         writer = SummaryWriter(TBLOGDIR)
     best_model_wts = ""
     best_acc = 0.0
     best_val_loss = 99999
     since = time.time()
-    model.to(device)
-    criterion.to(device)
     slice = 0
-    for epoch in range(num_epochs):
+    for epoch in range(0, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs))
         print('-' * 10)
         # Each epoch has a training and validation phase
         for phase in [0, 1]:
             if phase == 0:
-                print("Model In Training mode")
+                print("\nModel In Training mode")
                 model.train()  # Set model to training mode
             else:
-                print("Model In Validation mode")
+                print("\nModel In Validation mode")
                 model.eval()  # Set model to evaluate mode
                 slice = np.random.randint(0, len(dataloaders[phase]))
-
             running_loss = 0.0
             running_corrects = 0
             itr = 0
@@ -87,14 +62,12 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model, 
             for batch in tqdm(dataloaders[phase]):
                 image_batch, labels_batch = batch
                 image_batch = image_batch.unsqueeze(1)
-
+                image_batch = (image_batch - image_batch.min()) / \
+                              (image_batch.max() - image_batch.min())  # Min Max normalization
                 optimizer.zero_grad()
                 # forward
                 with torch.set_grad_enabled(phase == 0):
                     with autocast(enabled=True):
-                        image_batch = (image_batch - image_batch.min()) / \
-                                      (image_batch.max() - image_batch.min())  # Min Max normalization
-                        # image_batch = image_batch / np.linalg.norm(image_batch)  # Gaussian Normalization
                         outputs = model(image_batch.float().to(device))
                         loss = criterion(outputs.squeeze(1).float(), labels_batch.float().to(device))
 
@@ -132,20 +105,18 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model, 
                     writer.add_scalar("Loss/Validation", epoch_loss, epoch)
                     writer.add_scalar("Acc/Validation", epoch_acc, epoch)
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
-
+            print('\n{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
             # deep copy the model
             if phase == 1 and (epoch_acc >= best_acc or epoch_loss < best_val_loss):
-                print("Saving the best model weights")
+                print("\nSaving the best model weights")
                 best_acc = epoch_acc
                 best_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
 
     time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val Acc: {:4f}'.format(best_acc))
-
-    print("Saving the model")
+    print('\nTraining complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print('\nBest val Acc: {:4f}'.format(best_acc))
+    print("\nSaving the model")
     # save the model
     torch.save(model, modelPath)
     # load best model weights
