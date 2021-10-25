@@ -81,29 +81,32 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
     # Get the value for number of files per class
     samples_per_class = int(samples_per_subject / 4)
 
+    created = []
+    OP = Path(outPath)
+    for file_name in sorted(OP.glob("*.nii.gz")):
+        temp = str(file_name.name)
+        ssim = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+        fileName = temp.replace(ssim, "")
+        fileName = fileName.split("_")[0]
+        if fileName not in created:
+            created.append(fileName)
+
     for file_name in sorted(main_Path.glob("*T1*.nii.gz")):
         output.append(file_name.name.replace(".nii.gz", ""))
 
-    print("Number of Subjects : ", len(output))
+    print("Number of Subjects in Main list   : ", len(output))
+    print("Number of Subjects in Created list: ", len(created))
+
+    output = list(set(output) - set(created))
+    print("Number of Subjects in New list: ", len(output))
+
 
     with open(outPath + csvFileName, 'w') as f:
         writer = csv.writer(f)
         writer.writerow(['Filename', 'SSIM', 'Axis', 'Counter'])
-    idx = 307
+    idx = 0
     while idx < len(output):
         if retry >= no_of_retry:
-            l = (ctr_1, ctr_2, ctr_3, ctr_4)
-            print("\nSubject :", output[idx], "   Values :", ctr_1, ctr_2, ctr_3, ctr_4)
-            # get index of smallest item in list
-            X = min(l)  # Getting the minimum no of items of each class
-            if X == 0:
-                print("Subject Removed")  # Subject is removed if one of the classes have 0 items
-            else:
-                print("Subject Added : ", output[idx], "  ID Values: ", idx)
-                c_1 = c_1[0:X]
-                c_2 = c_2[0:X]
-                c_3 = c_3[0:X]
-                c_4 = c_4[0:X]
             retry = 0
             idx += 1
         if flag == 1:  # Check - all class are equal
@@ -203,10 +206,10 @@ def RandDatasetCreation(inpPath, mainPath, outPath):
                 i += 1
 
 
-#out_path = "/media/hdd_storage/Budha/Dataset/SSIM/"
-#main_Path = "/media/hdd_storage/Budha/Dataset/Isotropic"
-#inp_Path = "/media/hdd_storage/Budha/Dataset/Regression"
-#RandDatasetCreation(inpPath=inp_Path, mainPath=main_Path, outPath=out_path)
+out_path = "/media/hdd_storage/Budha/Dataset/SSIM/"
+main_Path = "/media/hdd_storage/Budha/Dataset/Isotropic"
+inp_Path = "/media/hdd_storage/Budha/Dataset/Regression"
+RandDatasetCreation(inpPath=inp_Path, mainPath=main_Path, outPath=out_path)
 """fileName = "IXI002-Guys-0828-T1"
 singleSubjectCreation(fileName, inp_Path, main_Path, out_path, total_subjects=99, no_of_subjects=1, class_range_low=0.0,
                       class_range_high=0.25)

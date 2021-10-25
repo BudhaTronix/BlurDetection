@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 
 
 def getSubjects(inpPath):
-    output = selected = []
+    output = []
+    selected = []
     for file_name in sorted(inpPath.glob("*.nii.gz")):
         temp = str(file_name.name)
         ssim = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
@@ -20,8 +21,10 @@ def getSubjects(inpPath):
             bin_count = np.bincount(temp)
             if len(bin_count) == 4 and bin_count[0] == bin_count[1] == bin_count[2] == bin_count[3]:
                 selected.append(fileName)
-
+    print("Total Number of Subjects in Dataset:", len(output))
+    print("Total Number of Subjects Selected  :", len(output))
     return output, selected
+
 
 
 def returnClass(no_of_class, array):

@@ -58,8 +58,8 @@ class BlurDetection:
         self.shuffle_dataset = True
         self.random_seed = 42
         self.plot = False
-        self.num_epochs = 50
-        self.batch_size = 256
+        self.num_epochs = 3000
+        self.batch_size = 64
         self.debug = True
         self.log = True  # Make it true to log in Tensorboard
         self.transformation = False  # False - Custom transformation, True - Automatic
@@ -115,6 +115,7 @@ class BlurDetection:
         if self.shuffle_dataset:
             np.random.seed(self.random_seed)
             np.random.shuffle(filtered_subjects)
+
         # Split Subjects to Train and Validation
         train_subs = filtered_subjects[int(self.val_split * len(filtered_subjects)): len(filtered_subjects)]
         val_subs = filtered_subjects[0: int(self.val_split * len(filtered_subjects))]
@@ -228,7 +229,6 @@ class BlurDetection:
                     print("Successfully deleted the directory %s" % self.temp_Test_Path)
 
     def testModelScript_Dataloader(self, test_dataset_Path, csv_FileName="test.csv", generateCSV=False):
-
         checkCSV(dataset_Path=test_dataset_Path, csv_FileName=csv_FileName, subjects=None, overwrite=generateCSV)
         dataset = CustomDataset(dataset_path=test_dataset_Path, csv_file=test_dataset_Path + csv_FileName,
                                 transform=self.transform, useModel=self.useModel)
