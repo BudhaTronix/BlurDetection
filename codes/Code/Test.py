@@ -6,12 +6,28 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchio as tio
+from pathlib import Path
 
 try:
     from utils import returnClass
 except ImportError:
     sys.path.insert(1, '../Utils/')
     from utils import returnClass
+
+
+def saveImage(images, output):
+    # create grid of images
+    plt.figure(figsize=(10, 10))
+    for i in range(16):
+        # Start next subplot.
+        plt.subplot(4, 4, i + 1, title=" | Pred:" + str(np.around(output[i], 2)))
+        plt.xticks([])
+        plt.yticks([])
+        # plt.grid(False)
+        plt.imshow(images[i], cmap="gray")
+    plt.show()
+
 
 
 def visualize(pred, label, no_class):
@@ -147,3 +163,33 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
             if debug:
                 for i in range(len(outputs)):
                     print("FileName: ", labels_batch[i] + " --  Model OP-> ", outputs[i])
+
+
+def getModelOP_filePath(filePath, modelPath, transform, device="cuda"):
+    inpPath = Path(filePath)
+    print("Model In Testing mode")
+    model = torch.load(modelPath)
+    model.eval()
+    model.to(device)
+    with torch.no_grad():
+        store_output = []
+        store_img =  []
+        itr = 1
+        for file_name in sorted(inpPath.glob("*.nii.gz")):
+            img = tio.ScalarImage(file_name)[tio.DATA].permute(0, 3, 1, 2)
+            img_transformed = transform(img).squeeze()
+            inputs = (img_transformed - img_transformed.min()) / (
+                        img_transformed.max() - img_transformed.min())  # Min Max normalization
+            output = model(inputs.unsqueeze(0).unsqueeze(0).to(device))
+            # output = torch.nn.Sigmoid(output)
+            output = output.detach().cpu().squeeze().tolist()
+            store_output.append(output)
+            store_img.append(inputs.unsqueeze(2))
+
+            if itr % 16 == 0:
+                images = store_img
+                output = store_output
+                saveImage(images, output)
+                store_output = []
+                store_img = []
+            itr += 1
