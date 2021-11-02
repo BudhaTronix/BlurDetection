@@ -112,6 +112,7 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                 best_acc = epoch_acc
                 best_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
+                torch.save(model, best_model_wts)
 
     time_elapsed = time.time() - since
     print('\nTraining complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

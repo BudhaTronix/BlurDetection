@@ -17,10 +17,10 @@ except ImportError:
 
 class TestingScript:
     def __init__(self):
-        self.dataset_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Dataset_2/"
+        self.dataset_Path = "/media/hdd_storage/Budha/Dataset/TestDataset/"
         self.csv_FileName = "test.csv"
-        self.modelPath = '../../model_weights/RESNET101.pth'
-        #self.modelPath_bestweights = '../../model_weights/R1_bw.pth'
+        self.modelPath = '../../model_weights/R1.pth'
+        self.modelPath_bestweights = '../../model_weights/RESNET18_bestWeights.pth'
 
         # Path for File to be tested
         self.filePath = "/media/hdd_storage/Budha/Dataset/Test/T2W_TSE.nii.gz"
@@ -35,8 +35,11 @@ class TestingScript:
         # Define the number of class to split for testing
         self.no_of_class = 4
 
+        # set the bartch size
+        self.batch_size = 64
+
         # Test Model or Use Model
-        self.useModel = True  # Set to False for testing model against GT
+        self.useModel = False  # Set to False for testing model against GT
 
     def testModelScript_Dataloader_Image(self, niftyFile=None, Subject=None, fileName=None):
         """
@@ -85,20 +88,22 @@ class TestingScript:
         checkCSV(dataset_Path=test_dataset_Path, csv_FileName=csv_FileName, subjects=None, overwrite=generateCSV)
         dataset = CustomDataset(dataset_path=test_dataset_Path, csv_file=test_dataset_Path + csv_FileName,
                                 transform=self.transform, useModel=self.useModel)
-        test_loader = torch.utils.data.DataLoader(dataset, batch_size=512)
+        test_loader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size)
 
         if self.useModel:
+            # To be used for model without GT
             getModelOP(dataloaders=test_loader, modelPath=self.modelPath, debug=True)
         else:
-            # Test Model with saved weights
+            # o be used for model with GT
             print("Testing model with saved weights")
-            testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath, debug=False)
+            testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath, debug=True)
+
+            # print("Testing model with best weights")
+            # testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath_bestweights, debug=False)
 
     def main(self):
-        self.testModelScript_Dataloader_Image(niftyFile=self.filePath)
-        # getModelOP_filePath(self.tempPath, self.modelPath, self.transform)
         # Use this function if you have a dataset created
-        # self.testModelScript_Dataloader(self.dataset_Path, self.csv_FileName, self.modelPath)
+        self.testModelScript_Dataloader(self.dataset_Path, self.csv_FileName)
 
         # Use this function if you have a dataset created
         # testModelScript_Dataloader_Image(Subject_Name=None, Subject_directory=None, modelPath)

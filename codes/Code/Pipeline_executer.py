@@ -18,5 +18,4 @@ def main():
         obj1.trainModel()
         obj1.test()
 
-
 main()

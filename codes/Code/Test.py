@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torchio as tio
 from pathlib import Path
+from tqdm import tqdm
 
 try:
     from utils import returnClass
@@ -27,7 +28,6 @@ def saveImage(images, output):
         # plt.grid(False)
         plt.imshow(images[i], cmap="gray")
     plt.show()
-
 
 
 def visualize(pred, label, no_class):
@@ -109,28 +109,29 @@ def testModel(dataloaders, no_class, modelPath, debug=False, device="cuda"):
     cf = torch.zeros(nb_classes, nb_classes)
     with torch.no_grad():
         for i, (inputs, classes) in enumerate(dataloaders):
-            inputs = inputs.unsqueeze(1).float().to(device)
+            inputs = inputs.unsqueeze(1).float()
             inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
-            classes = classes.to(device)
-            outputs = model(inputs)
+            classes = classes  # .to(device)
+            outputs = model(inputs.to(device))
             if len(lbl) == 0:
                 lbl = classes.cpu().tolist()
                 pred = outputs.detach().cpu().squeeze().tolist()
             else:
                 lbl.extend(classes.cpu().tolist())
                 pred.extend(outputs.detach().cpu().squeeze().tolist())
-            op_class = returnClass(no_class, outputs.squeeze())
-            lbl_class = returnClass(no_class, classes)
-            for t, p in zip(lbl_class, op_class):
-                cf[t.long(), p.long()] += 1
 
-            out = np.sum(op_class.cpu().detach().numpy() == lbl_class.cpu().numpy())
+            op_class = returnClass(no_class, outputs.squeeze().detach().cpu().numpy()).astype(int)
+            lbl_class = returnClass(no_class, classes).numpy().astype(int)
+            for t, p in zip(lbl_class, op_class):
+                cf[t, p] += 1
+
+            out = np.sum(op_class == lbl_class)
             batch_c += len(inputs)
             running_corrects += out
             if debug:
                 print("Raw Output    : Model OP-> ", outputs.detach().cpu().squeeze().tolist(), ", Label-> ",
                       classes.cpu().tolist())
-                print("Class Output  : Model OP-> ", op_class, ", Label-> ", lbl_class, "\n")
+                print("Class Output  : Model OP-> ", op_class, ", \nLabel-> ", lbl_class, "\n")
                 print("Accuracy per batch :", float(out / len(inputs) * 100), "%")
 
     cf = cf.detach().cpu().numpy()
@@ -173,13 +174,13 @@ def getModelOP_filePath(filePath, modelPath, transform, device="cuda"):
     model.to(device)
     with torch.no_grad():
         store_output = []
-        store_img =  []
+        store_img = []
         itr = 1
         for file_name in sorted(inpPath.glob("*.nii.gz")):
             img = tio.ScalarImage(file_name)[tio.DATA].permute(0, 3, 1, 2)
             img_transformed = transform(img).squeeze()
             inputs = (img_transformed - img_transformed.min()) / (
-                        img_transformed.max() - img_transformed.min())  # Min Max normalization
+                    img_transformed.max() - img_transformed.min())  # Min Max normalization
             output = model(inputs.unsqueeze(0).unsqueeze(0).to(device))
             # output = torch.nn.Sigmoid(output)
             output = output.detach().cpu().squeeze().tolist()

@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torchio as tio
+import pytorch_ssim
 
 
 def getClassbounds(classVal):
@@ -52,12 +53,46 @@ def getSubjects(inpPath):
                         count = 25 - bin_count[i]
                         low, high = getClassbounds(i)
                         print("Number if files to create: ", count, "  Class:", i)
-                        singleSubjectCreation(fileName, inp_Path, main_Path, out_path, total_subjects=len(temp), no_of_subjects=count,
+                        singleSubjectCreation(fileName, inp_Path, main_Path, out_path, total_subjects=len(temp),
+                                              no_of_subjects=count,
                                               class_range_low=low,
                                               class_range_high=high)
             else:
                 print("Code to be updated")
 
+            subject_ctr += 1
+    return output
+
+
+def getTestSubjects(inpPath):
+    output = []
+    selected = []
+    subject_ctr = 1
+    for file_name in sorted(inpPath.glob("*.nii.gz")):
+        temp_fname = str(file_name.name)
+        ssim = str("-" + file_name.name.split(".nii.gz")[0].split("-")[-1] + ".nii.gz")
+        fileName = temp_fname.replace(ssim, "")
+        fileName = fileName.split("_")[0]
+        if fileName not in output:
+            output.append(fileName)
+            temp = []
+            temp_files =[]
+            for sub_file_name in sorted(inpPath.glob(str("*" + fileName + "*"))):
+                temp.append(float(sub_file_name.name.split(".nii.gz")[0].split("-")[-1]))
+                temp_files.append(sub_file_name)
+
+
+            temp = returnClass(4, np.array(temp))
+            temp = temp.astype(int)
+            bin_count = np.bincount(temp)
+            print(subject_ctr, " - ", fileName, ":", len(temp), ", ", bin_count)
+
+            if len(bin_count) == 4 and (bin_count[0] == bin_count[1] == bin_count[2] == bin_count[3] == 25):
+                pass
+            else:
+                print(temp_files)
+                print("Add to dateset\n")
+                #selected.append()
             subject_ctr += 1
     return output
 
@@ -175,9 +210,6 @@ def subjectDeleter(inpPath):
             print("Filename: ", file_name, "  Count: ", ctr)
 
 
-import pytorch_ssim
-
-
 def singleSubjectCreation(fileName, inpPath, mainPath, outPath, total_subjects,
                           no_of_subjects, class_range_low, class_range_high):
     inpPath = Path(inpPath)
@@ -226,13 +258,38 @@ def singleSubjectCreation(fileName, inpPath, mainPath, outPath, total_subjects,
                     csv_update_counter += 1
                     no_of_subjects -= 1
 
+def createTest(mainPath,trainPath, outPath):
+    mainD = []
+    trainD =[]
+    for train_file_name in tqdm(sorted(trainPath.glob(str("*.nii.gz")))):
+        trainD.append(train_file_name.name)
+    for main_file_name in sorted(mainPath.glob(str("*.nii.gz"))):
+        mainD.append(main_file_name.name)
+
+    print(trainD)
+    """# print(train_file_name.name, main_file_name.name)
+    if train_file_name.name == main_file_name.name:
+        print(main_file_name)
+        break"""
+
+
 
 inpPath = "/media/hdd_storage/Budha/Dataset/TrainDataset/"
 origPath = "/media/hdd_storage/Budha/Dataset/Regression"
-#a, b, c = subjectsDatasetCreated(inpPath, origPath)
+mainPath = "/media/hdd_storage/Budha/Dataset/SSIM"
+outPath = "/media/hdd_storage/Budha/Dataset/Test"
+
+
+mainPath = Path(mainPath)
+trainPath = Path(inpPath)
+outPath = Path(outPath)
+#createTest(mainPath, trainPath, outPath)
+getTestSubjects(mainPath)
+#getTestSubjects(inpPath)
+# a, b, c = subjectsDatasetCreated(inpPath, origPath)
 # print(len(a),len(b),len(c))
-for i in range(3,6):
-   display_dataset_dist(inpPath, no_of_class=i)
+"""for i in range(3, 6):
+    display_dataset_dist(inpPath, no_of_class=i)
 inpPath = Path(inpPath)
-getSubjects(inpPath)
+getSubjects(inpPath)"""
 # subjectDeleter(inpPath)

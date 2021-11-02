@@ -29,7 +29,7 @@ def getSubjects(inpPath):
 
 def returnClass(no_of_class, array):
     class_intervals = 1 / no_of_class
-    array[array == 0] = 0
+    array[array <= 0] = 0
     array[array >= 1] = no_of_class - 1
     for i in range(no_of_class - 1, -1, -1):
         array[(array > (class_intervals * i)) & (array <= (class_intervals * (i + 1)))] = i
