@@ -1,6 +1,6 @@
 {
   "FCM": {
-    "Dataset_Path": "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/Dataset/",
+    "Dataset_Path": "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TrainDataset/",
     "Test_Dataset_Path": "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/",
     "model_Path": {
       "1": "../../model_weights/RESNET18.pth",
@@ -18,7 +18,8 @@
       "3": "runs/BlurDetection/Training/ResNet101/{}"
     },
     "tempdir": "/home/budha/tmp/",
-    "tempdirTestDataset": "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/temp/tmp/"
+    "tempdirTestDataset": "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/temp/tmp/",
+    "GPU_IDs": "4,5"
   },
   "StudentPC": {
     "Dataset_Path": "/media/hdd_storage/Budha/Dataset/TrainDataset/",

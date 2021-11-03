@@ -5,6 +5,8 @@ from pathlib import Path
 import tempfile
 import numpy as np
 import torch
+
+torch.set_num_threads(1)
 import torch.nn as nn
 import torch.optim as optim
 import torchio as tio
@@ -32,18 +34,14 @@ torch.backends.cudnn.benchmark = True
 torch.cuda.manual_seed(42)
 
 
-# GPU Setup
-# device_id = 5
-# os.environ["CUDA_VISIBLE_DEVICES"] = str(device_id)
-# device = "cuda"
-
 class BlurDetection:
-    def __init__(self, data, system_to_run, model_selection):
+    def __init__(self, data, system_to_run, model_selection, deviceIds):
         """
         Args:
 
         """
         # Define Paths
+        self.system_to_run = data[system_to_run]
         self.dataset_Path = data[system_to_run]["Dataset_Path"]
         self.test_dataset_Path = data[system_to_run]["Test_Dataset_Path"]
         self.modelPath = data[system_to_run]["model_Path"][str(model_selection)]
@@ -52,22 +50,23 @@ class BlurDetection:
         self.temp_Test_Path = data[system_to_run]["tempdirTestDataset"]
 
         # Configuration
+        self.OverWriteCSVFile = False                              # Set it to true if you want to use existing CSV file
         self.model_selection = model_selection
-        self.useExistingWeights = False  # Use existing weights
+        self.useExistingWeights = False                            # Use existing weights
         self.val_split = 0.3
         self.shuffle_dataset = True
         self.random_seed = 42
         self.plot = False
         self.num_epochs = 3000
-        self.batch_size = 64
+        self.batch_size = 256
         self.debug = True
-        self.log = True  # Make it true to log in Tensorboard
-        self.transformation = False  # False - Custom transformation, True - Automatic
-        self.transform_val = (1, 224, 224)  # Set this value if you want custom transformation
-        self.multiGPUTraining = False
-        self.deviceIDs = [0, 1, 2]
-        self.delete_dir = False  # Set to true if you want to delete the temp directory of test dataset
-        self.useModel = True  # Set to False for testing model against GT
+        self.log = True                                            # Make it true to log in Tensorboard
+        self.transformation = False                                # False - Custom transformation, True - Automatic
+        self.transform_val = (1, 230, 230)                         # Set this value if you want custom transformation
+        self.multiGPUTraining = True
+        self.deviceIDs = deviceIds
+        self.delete_dir = False                   # Set to true if you want to delete the temp directory of test dataset
+        self.useModel = False                                      # Set to False for testing model against GT
 
         print("Current temp directory:", tempfile.gettempdir())
         tempfile.tempdir = data[system_to_run]["tempdir"]
@@ -85,7 +84,7 @@ class BlurDetection:
         num_classes = 1
         num_ftrs = model.fc.in_features
         model.fc = nn.Sequential(nn.Linear(num_ftrs, num_classes), nn.Sigmoid())
-        if self.multiGPUTraining:
+        if self.multiGPUTraining and torch.cuda.device_count() > 1:
             model = nn.DataParallel(model, device_ids=self.deviceIDs)
         else:
             model = model.to(self.getDevice())
@@ -102,10 +101,10 @@ class BlurDetection:
         criterion = criterion.to(self.getDevice())
         return criterion
 
-    @staticmethod
-    def getDevice():
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        return device
+    def getDevice(self):
+        if self.multiGPUTraining:
+            return torch.device("cuda:" + str(self.deviceIDs[0]) if torch.cuda.is_available() else 'cpu')
+        return torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
     def getTrainValSubjects(self):
         # Retrieve the subjects having equal distribution of class
@@ -148,8 +147,10 @@ class BlurDetection:
         transform_val = self.getTransformation()
         train_subs, val_subs = self.getTrainValSubjects()
         # Training and Validation Section
-        checkCSV(dataset_Path=self.dataset_Path, csv_FileName="train.csv", subjects=train_subs, overwrite=True)
-        checkCSV(dataset_Path=self.dataset_Path, csv_FileName="val.csv", subjects=val_subs, overwrite=True)
+        checkCSV(dataset_Path=self.dataset_Path, csv_FileName="train.csv", subjects=train_subs,
+                 overwrite=self.OverWriteCSVFile)
+        checkCSV(dataset_Path=self.dataset_Path, csv_FileName="val.csv", subjects=val_subs,
+                 overwrite=self.OverWriteCSVFile)
 
         train_loader = self.getDataloader(dataset_Path=self.dataset_Path, csv_FileName="train.csv",
                                           transform=transform_val)

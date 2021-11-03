@@ -33,6 +33,7 @@ def saveImage(images, labels, output):
 
 def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                criterion, optimizer, log=False, log_dir="runs/", device="cuda"):
+    model.to(device)
     precision = 1  # Sets the decimal value
     if log:
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
@@ -44,6 +45,7 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
     since = time.time()
     slice = 0
     for epoch in range(0, num_epochs):
+        # torch.cuda.empty_cache()
         print('Epoch {}/{}'.format(epoch, num_epochs))
         print('-' * 10)
         # Each epoch has a training and validation phase
@@ -86,7 +88,7 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                         # write to tensorboard
                         writer.add_figure(text, figure, epoch)
                     # statistics
-                    running_loss += loss.item()
+                    running_loss += loss.detach().cpu().item()
                     running_corrects += np.sum(np.around(outputs.detach().cpu().squeeze().numpy(),
                                                          decimals=precision) == np.around(labels_batch.numpy(),
                                                                                           decimals=precision))
@@ -111,8 +113,10 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                 print("\nSaving the best model weights")
                 best_acc = epoch_acc
                 best_val_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
-                torch.save(model, best_model_wts)
+                # best_model_wts = copy.deepcopy(model.state_dict())
+                # torch.save(model.state_dict(), modelPath_bestweight)
+                torch.save(model.module.state_dict(), modelPath_bestweight)  # For multi GPU
+                # torch.save(model, modelPath_bestweight)
 
     time_elapsed = time.time() - since
     print('\nTraining complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -121,5 +125,7 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
     # save the model
     torch.save(model, modelPath)
     # load best model weights
-    model.load_state_dict(best_model_wts)
-    torch.save(model, modelPath_bestweight)
+
+    # print("\nSaving the best weights model")
+    # model.load_state_dict(best_model_wts)
+    # torch.save(model, modelPath_bestweight)

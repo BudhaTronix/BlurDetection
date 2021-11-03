@@ -3,6 +3,8 @@ import torch
 import os
 import torchio as tio
 from CSVGenerator import checkCSV
+from torchvision import models
+import torch.nn as nn
 
 try:
     from ..Code.Dataloader import CustomDataset
@@ -10,20 +12,21 @@ try:
 except ImportError:
     sys.path.insert(1, '../Code')
     from Dataloader import CustomDataset
-    from Test import testModel, getModelOP, getModelOP_filePath
+    from Test import testModel  # , getModelOP, getModelOP_filePath
 
-#os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 
 
 class TestingScript:
     def __init__(self):
-        self.dataset_Path = "/media/hdd_storage/Budha/Dataset/TestDataset/"
+        self.dataset_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
         self.csv_FileName = "test.csv"
-        self.modelPath = '../../model_weights/R1.pth'
+        self.modelPath = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R101.pth'
         self.modelPath_bestweights = '../../model_weights/RESNET18_bestWeights.pth'
 
         # Path for File to be tested
-        self.filePath = "/media/hdd_storage/Budha/Dataset/Test/T2W_TSE.nii.gz"
+        # self.filePath = "/media/hdd_storage/Budha/Dataset/Test/T2W_TSE.nii.gz"
 
         # Define Temporary Directory
         self.tempPath = "/home/budha/tmp/data/"
@@ -90,13 +93,22 @@ class TestingScript:
                                 transform=self.transform, useModel=self.useModel)
         test_loader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size)
 
+        device = torch.device('cuda:2')
+        model = models.resnet101(pretrained=False)
+        model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        num_classes = 1
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Sequential(nn.Linear(num_ftrs, num_classes), nn.Sigmoid())
+        model.load_state_dict(torch.load(self.modelPath, map_location=device))
+        # model.load_state_dict(torch.load(self.modelPath))
+
         if self.useModel:
             # To be used for model without GT
             getModelOP(dataloaders=test_loader, modelPath=self.modelPath, debug=True)
         else:
             # o be used for model with GT
             print("Testing model with saved weights")
-            testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath, debug=True)
+            testModel(dataloaders=test_loader, no_class=self.no_of_class, model=model, debug=False)
 
             # print("Testing model with best weights")
             # testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath_bestweights, debug=False)

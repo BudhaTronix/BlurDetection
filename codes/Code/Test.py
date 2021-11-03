@@ -97,9 +97,8 @@ def calMeanAbsError(expected, predicted):
     print("Variance               : ", np.std(errors), "\n")
 
 
-def testModel(dataloaders, no_class, modelPath, debug=False, device="cuda"):
+def testModel(dataloaders, no_class, model, debug=False, device="cuda:2"):
     print("Model In Testing mode")
-    model = torch.load(modelPath)
     model.eval()
     model.to(device)
     running_corrects = 0
