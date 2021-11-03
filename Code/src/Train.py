@@ -32,8 +32,9 @@ def saveImage(images, labels, output):
 
 
 def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
-               criterion, optimizer, log=False, log_dir="runs/", device="cuda"):
+               criterion, optimizer, log=False, log_dir="runs/", device="cuda", isMultiGPU=False):
     model.to(device)
+    criterion.to(device)
     precision = 1  # Sets the decimal value
     if log:
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
@@ -114,8 +115,10 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                 best_acc = epoch_acc
                 best_val_loss = epoch_loss
                 # best_model_wts = copy.deepcopy(model.state_dict())
-                # torch.save(model.state_dict(), modelPath_bestweight)
-                torch.save(model.module.state_dict(), modelPath_bestweight)  # For multi GPU
+                if isMultiGPU:
+                    torch.save(model.module.state_dict(), modelPath_bestweight)  # For multi GPU
+                else:
+                    torch.save(model.state_dict(), modelPath_bestweight)
                 # torch.save(model, modelPath_bestweight)
 
     time_elapsed = time.time() - since

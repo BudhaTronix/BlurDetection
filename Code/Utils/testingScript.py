@@ -7,10 +7,10 @@ from torchvision import models
 import torch.nn as nn
 
 try:
-    from ..Code.Dataloader import CustomDataset
-    from ..Code.Test import testModel, getModelOP, getModelOP_filePath
+    from Code.src.Dataloader import CustomDataset
+    from Code.src.Test import testModel, getModelOP, getModelOP_filePath
 except ImportError:
-    sys.path.insert(1, '../Code')
+    sys.path.insert(1, '..')
     from Dataloader import CustomDataset
     from Test import testModel  # , getModelOP, getModelOP_filePath
 
@@ -109,9 +109,6 @@ class TestingScript:
             # o be used for model with GT
             print("Testing model with saved weights")
             testModel(dataloaders=test_loader, no_class=self.no_of_class, model=model, debug=False)
-
-            # print("Testing model with best weights")
-            # testModel(dataloaders=test_loader, no_class=self.no_of_class, modelPath=self.modelPath_bestweights, debug=False)
 
     def main(self):
         # Use this function if you have a dataset created

@@ -1,11 +1,9 @@
 from __future__ import division
 from __future__ import print_function
 
-import sys
 import csv
 import random
 from pathlib import Path
-import matplotlib.pyplot as plt
 import torch
 import torchio as tio
 

@@ -9,7 +9,7 @@ Ranges for motion corruption:
 Model: 2D Resnet101
 
 
-![img.png](img.png)
+![img.png](Documentation/img.png)
 
 # How to run the code
 

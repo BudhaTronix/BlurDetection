@@ -62,5 +62,26 @@
     },
     "tempdir": "/home/budha/tmp/",
     "tempdirTestDataset": "/home/budha/tmp/Dataset"
+  },
+  "BRAIN": {
+    "Dataset_Path": "/media/hdd_storage/Budha/Dataset/SSIM/",
+    "Test_Dataset_Path": "/media/hdd_storage/Budha/Dataset/",
+    "model_Path": {
+      "1": "../../model_weights/RESNET18.pth",
+      "2": "../../model_weights/RESNET50.pth",
+      "3": "../../model_weights/RESNET101.pth"
+    },
+    "model_bestweight_Path": {
+      "1": "../../model_weights/RESNET18_bestWeights.pth",
+      "2": "../../model_weights/RESNET50_bestWeights.pth",
+      "3": "../../model_weights/RESNET101_bestWeights.pth"
+    },
+    "log_dir": {
+      "1": "runs/BlurDetection/Training/ResNet18/{}",
+      "2": "runs/BlurDetection/Training/ResNet50/{}",
+      "3": "runs/BlurDetection/Training/ResNet101/{}"
+    },
+    "tempdir": "/home/budha/tmp/",
+    "tempdirTestDataset": "/home/budha/tmp/Dataset"
   }
 }

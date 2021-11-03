@@ -97,7 +97,7 @@ def calMeanAbsError(expected, predicted):
     print("Variance               : ", np.std(errors), "\n")
 
 
-def testModel(dataloaders, no_class, model, debug=False, device="cuda:2"):
+def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
     print("Model In Testing mode")
     model.eval()
     model.to(device)
@@ -107,7 +107,7 @@ def testModel(dataloaders, no_class, model, debug=False, device="cuda:2"):
     nb_classes = no_class
     cf = torch.zeros(nb_classes, nb_classes)
     with torch.no_grad():
-        for i, (inputs, classes) in enumerate(dataloaders):
+        for i, (inputs, classes) in tqdm(enumerate(dataloaders)):
             inputs = inputs.unsqueeze(1).float()
             inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
             classes = classes  # .to(device)
