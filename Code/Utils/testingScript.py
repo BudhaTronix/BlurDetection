@@ -1,10 +1,12 @@
-import sys
-import torch
 import os
-import torchio as tio
-from CSVGenerator import checkCSV
-from torchvision import models
+import sys
+
+import torch
 import torch.nn as nn
+import torchio as tio
+from torchvision import models
+
+from CSVGenerator import checkCSV
 
 try:
     from Code.src.Dataloader import CustomDataset

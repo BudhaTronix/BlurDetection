@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def getSubjects(inpPath):
@@ -24,7 +26,6 @@ def getSubjects(inpPath):
     print("Total Number of Subjects in Dataset:", len(output))
     print("Total Number of Subjects Selected  :", len(output))
     return output, selected
-
 
 
 def returnClass(no_of_class, array):
@@ -75,3 +76,6 @@ def display_dataset_dist(inpPath, no_of_class=4):
     plot_bar(np.array(ssims), no_of_class=no_of_class)
 
 
+def checkFilePaths():
+    print(os.getcwd())
+    # os.mkdir('model_W1')

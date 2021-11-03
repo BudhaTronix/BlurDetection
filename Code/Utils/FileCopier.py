@@ -1,7 +1,8 @@
-import shutil
-import numpy as np
 import os
+import shutil
 from pathlib import Path
+
+import numpy as np
 
 source_dir = '/media/hdd_storage/Budha/Dataset/SSIM/'
 target_dir = '/media/hdd_storage/Budha/Dataset/TrainDataset/'

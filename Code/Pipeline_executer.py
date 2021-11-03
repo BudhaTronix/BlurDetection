@@ -1,5 +1,6 @@
-from Code.src.Pipeline import BlurDetection
 import json
+from Utils.utils import checkFilePaths
+from src.Pipeline import BlurDetection
 
 
 # os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
@@ -31,7 +32,7 @@ def main():
         num_class_confusionMatrix = 4
 
         obj = BlurDetection(data, system_to_run, model_selection, deviceIds, enableMultiGPU, defaultGPUID,
-                             epochs, Tensorboard, batch_size, validation_split, num_class_confusionMatrix)
+                            epochs, Tensorboard, batch_size, validation_split, num_class_confusionMatrix)
 
         print(" Tensorboard Logging : ", obj.log)
         print(" Validation Split    : ", obj.val_split * 100, "%")
@@ -40,4 +41,9 @@ def main():
         obj.test()
 
 
-main()
+def test():
+    checkFilePaths()
+
+
+test()
+# main()

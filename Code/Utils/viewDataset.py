@@ -1,9 +1,11 @@
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import torchio as tio
+from tqdm import tqdm
+
 import pytorch_ssim
 
 

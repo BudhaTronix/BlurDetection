@@ -1,7 +1,8 @@
+from pathlib import Path
+
+import numpy as np
 import torchio as tio
 from motion import MotionCorrupter
-import numpy as np
-from pathlib import Path
 from tqdm import tqdm
 
 

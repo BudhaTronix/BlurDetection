@@ -1,6 +1,7 @@
-from pathlib import Path
 import csv
 import os
+from pathlib import Path
+
 from tqdm import tqdm
 
 

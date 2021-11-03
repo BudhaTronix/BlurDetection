@@ -1,21 +1,21 @@
 import itertools
-import os
 import sys
-import pandas as pd
-import seaborn as sns
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import torch
 import torchio as tio
-from pathlib import Path
 from tqdm import tqdm
-
-try:
+from Code.Utils.utils import returnClass
+"""try:
     from utils import returnClass
 except ImportError:
     sys.path.insert(1, '../Utils/')
     from utils import returnClass
-
+"""
 
 def saveImage(images, output):
     # create grid of images
