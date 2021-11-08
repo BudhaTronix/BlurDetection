@@ -145,7 +145,7 @@ def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
     pred = np.float32(pred)
     calMeanAbsError(predicted=pred, expected=lbl)
     calMSE(predicted=pred, expected=lbl)
-    visualize(pred, lbl, no_class)
+    #visualize(pred, lbl, no_class)
 
 
 def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
@@ -181,7 +181,6 @@ def getModelOP_filePath(filePath, modelPath, transform, device="cuda"):
             inputs = (img_transformed - img_transformed.min()) / (
                     img_transformed.max() - img_transformed.min())  # Min Max normalization
             output = model(inputs.unsqueeze(0).unsqueeze(0).to(device))
-            # output = torch.nn.Sigmoid(output)
             output = output.detach().cpu().squeeze().tolist()
             store_output.append(output)
             store_img.append(inputs.unsqueeze(2))

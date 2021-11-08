@@ -1,18 +1,16 @@
 import os
 import sys
-
 import torch
 import torch.nn as nn
 import torchio as tio
 from torchvision import models
-
-from CSVGenerator import checkCSV
-
+from Code.Utils.CSVGenerator import checkCSV
 try:
     from Code.src.Dataloader import CustomDataset
     from Code.src.Test import testModel, getModelOP, getModelOP_filePath
 except ImportError:
-    sys.path.insert(1, '..')
+    sys.path.insert(1, '../../Code')
+    # from CSVGenerator import checkCSV
     from Dataloader import CustomDataset
     from Test import testModel  # , getModelOP, getModelOP_filePath
 
@@ -24,8 +22,8 @@ class TestingScript:
     def __init__(self):
         self.dataset_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
         self.csv_FileName = "test.csv"
-        self.modelPath = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R101.pth'
-        self.modelPath_bestweights = '../../model_weights/RESNET18_bestWeights.pth'
+        self.modelPath = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R50.pth'
+        self.modelPath_bestweights = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R50.pth'
 
         # Path for File to be tested
         # self.filePath = "/media/hdd_storage/Budha/Dataset/Test/T2W_TSE.nii.gz"
@@ -115,9 +113,6 @@ class TestingScript:
     def main(self):
         # Use this function if you have a dataset created
         self.testModelScript_Dataloader(self.dataset_Path, self.csv_FileName)
-
-        # Use this function if you have a dataset created
-        # testModelScript_Dataloader_Image(Subject_Name=None, Subject_directory=None, modelPath)
 
 
 test = TestingScript()

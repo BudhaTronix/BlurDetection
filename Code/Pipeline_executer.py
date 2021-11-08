@@ -1,7 +1,5 @@
 import json
-from Utils.utils import checkFilePaths
-from src.Pipeline import BlurDetection
-
+from Code.src.Pipeline import BlurDetection
 
 # os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
 # os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
@@ -12,13 +10,13 @@ def main():
         data = json.load(f)
 
         # Configuration - System
-        system_to_run = "StudentPC"  # Select between - StudentPC, FCM, GPU18, BRAIN
-        model_selection = 2  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
+        system_to_run = "FCM"  # Select between - StudentPC, FCM, GPU18, BRAIN
+        model_selection = 3  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
         # Configuration - GPU
         enableMultiGPU = False
         deviceIds = [3, 4]
-        defaultGPUID = "cuda:0"
+        defaultGPUID = "cuda:2"
 
         # Configuration - Logging
         Tensorboard = False
@@ -37,13 +35,8 @@ def main():
         print(" Tensorboard Logging : ", obj.log)
         print(" Validation Split    : ", obj.val_split * 100, "%")
 
-        obj.train()
+        # obj.train()
         obj.test()
 
 
-def test():
-    checkFilePaths()
-
-
-test()
-# main()
+main()
