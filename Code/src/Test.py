@@ -1,5 +1,6 @@
 import itertools
 import sys
+import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,12 +11,14 @@ import torch
 import torchio as tio
 from tqdm import tqdm
 from Code.Utils.utils import returnClass
+
 """try:
     from utils import returnClass
 except ImportError:
     sys.path.insert(1, '../Utils/')
     from utils import returnClass
 """
+
 
 def saveImage(images, output):
     # create grid of images
@@ -145,7 +148,7 @@ def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
     pred = np.float32(pred)
     calMeanAbsError(predicted=pred, expected=lbl)
     calMSE(predicted=pred, expected=lbl)
-    #visualize(pred, lbl, no_class)
+    # visualize(pred, lbl, no_class)
 
 
 def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
@@ -165,10 +168,10 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
                     print("FileName: ", labels_batch[i] + " --  Model OP-> ", outputs[i])
 
 
-def getModelOP_filePath(filePath, modelPath, transform, device="cuda"):
+def getModelOP_filePath(filePath, model, transform, device="cuda"):
     inpPath = Path(filePath)
+    store = False
     print("Model In Testing mode")
-    model = torch.load(modelPath)
     model.eval()
     model.to(device)
     with torch.no_grad():
@@ -180,15 +183,55 @@ def getModelOP_filePath(filePath, modelPath, transform, device="cuda"):
             img_transformed = transform(img).squeeze()
             inputs = (img_transformed - img_transformed.min()) / (
                     img_transformed.max() - img_transformed.min())  # Min Max normalization
-            output = model(inputs.unsqueeze(0).unsqueeze(0).to(device))
+            output = model(inputs.unsqueeze(0).unsqueeze(0).float().to(device))
             output = output.detach().cpu().squeeze().tolist()
-            store_output.append(output)
-            store_img.append(inputs.unsqueeze(2))
+            print("FileName: ", str(file_name.name) + " --  Model OP-> ", output)
+            if store:
+                store_output.append(output)
+                store_img.append(inputs.unsqueeze(2))
+                if itr % 16 == 0:
+                    images = store_img
+                    output = store_output
+                    saveImage(images, output)
+                    store_output = []
+                    store_img = []
+                itr += 1
 
-            if itr % 16 == 0:
-                images = store_img
-                output = store_output
-                saveImage(images, output)
-                store_output = []
-                store_img = []
-            itr += 1
+
+def testModel_SingleImage(niftyFilePath=None, model="", transform="", tempPath=""):
+    delete_dir = False
+
+    Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
+    fileName = "temp"
+    # Create a temporary directory
+    try:
+        os.mkdir(tempPath)
+    except OSError:
+        print("Creation of temporary directory %s failed" % tempPath)
+    else:
+        print("Successfully created temporary directory %s " % tempPath)
+
+    # Traverse through the dataset to get the ssim values
+    for axis in range(0, 3):
+        if axis == 0:
+            Subject = Subject  # Coronal
+        elif axis == 1:
+            Subject = Subject.permute(0, 2, 1)  # Transverse
+        elif axis == 2:
+            Subject = Subject.permute(2, 0, 1)  # Axial
+        for i in range(0, len(Subject)):
+            image = Subject[i:(i + 1), :, :].unsqueeze(3)
+            temp = tio.ScalarImage(tensor=image)
+            print("Saved :", tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz')
+            temp.save(tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz', squeeze=True)
+
+    getModelOP_filePath(tempPath, model, transform)
+
+    # Delete the temporary directory
+    if delete_dir:
+        try:
+            os.rmdir(tempPath)
+        except OSError:
+            print("Deletion of the directory %s failed" % tempPath)
+        else:
+            print("Successfully deleted the directory %s" % tempPath)

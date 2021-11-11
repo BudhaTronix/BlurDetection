@@ -76,7 +76,6 @@ class TestingScript:
                     temp.save(self.tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz', squeeze=True)
 
             getModelOP_filePath(self.tempPath, self.modelPath, self.transform)
-            # self.testModelScript_Dataloader(test_dataset_Path=self.tempPath, generateCSV=True)
 
             # Delete the temporary directory
             if self.delete_dir:

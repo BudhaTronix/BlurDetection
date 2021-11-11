@@ -9,7 +9,7 @@ from torchvision import models
 from tqdm import tqdm
 from pathlib import Path
 from Code.src.Dataloader import CustomDataset
-from Code.src.Test import testModel
+from Code.src.Test import testModel, testModel_SingleImage
 from Code.src.Train import trainModel
 from Code.Utils.CSVGenerator import checkCSV
 from Code.Utils.utils import getSubjects
@@ -25,7 +25,7 @@ except ImportError:
 class BlurDetection:
     def __init__(self, data, system_to_run, model_selection, deviceIds,
                  enableMultiGPU, defaultGPUID, epochs, Tensorboard, batch_size,
-                 validation_split, num_class_confusionMatrix):
+                 validation_split, num_class_confusionMatrix, testFile):
         """
         Args:
 
@@ -38,6 +38,7 @@ class BlurDetection:
         self.modelPath_bestweights = data[system_to_run]["model_bestweight_Path"][str(model_selection)]
         self.log_dir_Path = data[system_to_run]["log_dir"][str(model_selection)]
         self.temp_Test_Path = data[system_to_run]["tempdirTestDataset"]
+        self.testFile = testFile
 
         # Configuration
         self.defaultGPU = defaultGPUID
@@ -186,3 +187,9 @@ class BlurDetection:
         print("Testing model with saved weights")
         testModel(dataloaders=test_loader, model=model,
                   debug=False, no_class=self.class_cfm, device=self.getDevice())
+
+    def test_singleFile(self):
+        model = self.defineModel()
+        model.load_state_dict(torch.load(self.modelPath_bestweights, map_location=self.getDevice()))
+        print("Testing model with saved weights")
+        testModel_SingleImage(niftyFilePath=self.testFile, model=model, transform=self.getTransformation())

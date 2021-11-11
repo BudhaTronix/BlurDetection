@@ -27,16 +27,25 @@ def main():
         validation_split = 0.3
 
         # Configuration - Testing
-        num_class_confusionMatrix = 4
+        num_class_confusionMatrix = 9
+        path_single_file = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/temp/IXI230-IOP-0869.nii.gz"
+
+        # Train Test setting
+        Train = False
+        Test = True
 
         obj = BlurDetection(data, system_to_run, model_selection, deviceIds, enableMultiGPU, defaultGPUID,
-                            epochs, Tensorboard, batch_size, validation_split, num_class_confusionMatrix)
+                            epochs, Tensorboard, batch_size, validation_split,
+                            num_class_confusionMatrix, path_single_file)
 
-        print(" Tensorboard Logging : ", obj.log)
-        print(" Validation Split    : ", obj.val_split * 100, "%")
-
-        # obj.train()
-        obj.test()
+        if Train:
+            print(" Tensorboard Logging : ", obj.log)
+            print(" Validation Split    : ", obj.val_split * 100, "%")
+            obj.train()
+        if Test:
+            # obj.test()
+            if path_single_file != "":
+                obj.test_singleFile()
 
 
 main()
