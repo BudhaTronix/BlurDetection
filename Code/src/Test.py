@@ -198,9 +198,9 @@ def getModelOP_filePath(filePath, model, transform, device="cuda"):
                 itr += 1
 
 
-def testModel_SingleImage(niftyFilePath=None, model="", transform="", tempPath=""):
+def testModel_SingleImage(niftyFilePath=None, model="", transform=""):
     delete_dir = False
-
+    tempPath = str(Path(niftyFilePath).parent) + "/tmp/"
     Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
     fileName = "temp"
     # Create a temporary directory
