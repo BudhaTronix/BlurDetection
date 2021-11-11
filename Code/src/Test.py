@@ -168,49 +168,13 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
                     print("FileName: ", labels_batch[i] + " --  Model OP-> ", outputs[i])
 
 
-def getModelOP_filePath(filePath, model, transform, device="cuda"):
-    inpPath = Path(filePath)
-    store = False
-    print("Model In Testing mode")
+def testModel_Image(niftyFilePath=None, model=None, transform=None,tempPath="", device="cuda"):
     model.eval()
     model.to(device)
-    with torch.no_grad():
-        store_output = []
-        store_img = []
-        itr = 1
-        for file_name in sorted(inpPath.glob("*.nii.gz")):
-            img = tio.ScalarImage(file_name)[tio.DATA].permute(0, 3, 1, 2)
-            img_transformed = transform(img).squeeze()
-            inputs = (img_transformed - img_transformed.min()) / (
-                    img_transformed.max() - img_transformed.min())  # Min Max normalization
-            output = model(inputs.unsqueeze(0).unsqueeze(0).float().to(device))
-            output = output.detach().cpu().squeeze().tolist()
-            print("FileName: ", str(file_name.name) + " --  Model OP-> ", output)
-            if store:
-                store_output.append(output)
-                store_img.append(inputs.unsqueeze(2))
-                if itr % 16 == 0:
-                    images = store_img
-                    output = store_output
-                    saveImage(images, output)
-                    store_output = []
-                    store_img = []
-                itr += 1
-
-
-def testModel_SingleImage(niftyFilePath=None, model="", transform=""):
-    delete_dir = False
-    tempPath = str(Path(niftyFilePath).parent) + "/tmp/"
-    Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
+    save = False
+    store_images = False
     fileName = "temp"
-    # Create a temporary directory
-    try:
-        os.mkdir(tempPath)
-    except OSError:
-        print("Creation of temporary directory %s failed" % tempPath)
-    else:
-        print("Successfully created temporary directory %s " % tempPath)
-
+    Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
     # Traverse through the dataset to get the ssim values
     for axis in range(0, 3):
         if axis == 0:
@@ -219,19 +183,27 @@ def testModel_SingleImage(niftyFilePath=None, model="", transform=""):
             Subject = Subject.permute(0, 2, 1)  # Transverse
         elif axis == 2:
             Subject = Subject.permute(2, 0, 1)  # Axial
+        itr = 1
         for i in range(0, len(Subject)):
-            image = Subject[i:(i + 1), :, :].unsqueeze(3)
-            temp = tio.ScalarImage(tensor=image)
-            print("Saved :", tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz')
-            temp.save(tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz', squeeze=True)
-
-    getModelOP_filePath(tempPath, model, transform)
-
-    # Delete the temporary directory
-    if delete_dir:
-        try:
-            os.rmdir(tempPath)
-        except OSError:
-            print("Deletion of the directory %s failed" % tempPath)
-        else:
-            print("Successfully deleted the directory %s" % tempPath)
+            img = Subject[i:(i + 1), :, :]
+            if save:
+                temp = tio.ScalarImage(tensor=img.unsqueeze(3))
+                print("Saved :", tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz')
+                temp.save(tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz', squeeze=True)
+            img_transformed = transform(img.unsqueeze(0)).squeeze()
+            inputs = (img_transformed - img_transformed.min()) / (
+                    img_transformed.max() - img_transformed.min())  # Min Max normalization
+            with torch.no_grad():
+                output = model(inputs.unsqueeze(0).unsqueeze(0).float().to(device))
+                output = output.detach().cpu().squeeze().tolist()
+                print("Axis : ", axis, " Slice Number: ", i, " --  Model OP-> ", output)
+                if store_images:
+                    store_output.append(output)
+                    store_img.append(inputs.unsqueeze(2))
+                    if itr % 16 == 0:
+                        images = store_img
+                        output = store_output
+                        saveImage(images, output)
+                        store_output = []
+                        store_img = []
+                    itr += 1

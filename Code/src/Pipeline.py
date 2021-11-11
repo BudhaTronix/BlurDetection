@@ -9,7 +9,7 @@ from torchvision import models
 from tqdm import tqdm
 from pathlib import Path
 from Code.src.Dataloader import CustomDataset
-from Code.src.Test import testModel, testModel_SingleImage
+from Code.src.Test import testModel, testModel_SingleImage, testModel_Image
 from Code.src.Train import trainModel
 from Code.Utils.CSVGenerator import checkCSV
 from Code.Utils.utils import getSubjects
@@ -192,4 +192,4 @@ class BlurDetection:
         model = self.defineModel()
         model.load_state_dict(torch.load(self.modelPath_bestweights, map_location=self.getDevice()))
         print("Testing model with saved weights")
-        testModel_SingleImage(niftyFilePath=self.testFile, model=model, transform=self.getTransformation())
+        testModel_Image(niftyFilePath=self.testFile, model=model, transform=self.getTransformation())
