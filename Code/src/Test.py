@@ -3,6 +3,10 @@ import sys
 import os
 from pathlib import Path
 
+# from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw
+from torchvision import transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -168,35 +172,41 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
                     print("FileName: ", labels_batch[i] + " --  Model OP-> ", outputs[i])
 
 
-def testModel_Image(niftyFilePath=None, model=None, transform=None,tempPath="", device="cuda"):
+def testModel_Image(niftyFilePath=None, model=None, transform=None, output_path="", device="cuda"):
     model.eval()
     model.to(device)
-    save = False
+    transformation = True
     store_images = False
-    fileName = "temp"
+    fileName = niftyFilePath.split("/")[-1].split(".nii.gz")[0]
+    disp = False
     Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
     # Traverse through the dataset to get the ssim values
     for axis in range(0, 3):
         if axis == 0:
             Subject = Subject  # Coronal
         elif axis == 1:
-            Subject = Subject.permute(0, 2, 1)  # Transverse
+            Subject = Subject.permute(2, 1, 0)  # Transverse
         elif axis == 2:
-            Subject = Subject.permute(2, 0, 1)  # Axial
+            Subject = Subject.permute(1, 2, 0)  # Axial
         itr = 1
+        store = None
         for i in range(0, len(Subject)):
             img = Subject[i:(i + 1), :, :]
-            if save:
-                temp = tio.ScalarImage(tensor=img.unsqueeze(3))
-                print("Saved :", tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz')
-                temp.save(tempPath + str(fileName) + "-" + str(axis) + "_" + str(i) + '.nii.gz', squeeze=True)
-            img_transformed = transform(img.unsqueeze(0)).squeeze()
+            if transformation:
+                img_transformed = transform(img.unsqueeze(0)).squeeze()
+            else:
+                img_transformed = img.squeeze()
             inputs = (img_transformed - img_transformed.min()) / (
                     img_transformed.max() - img_transformed.min())  # Min Max normalization
             with torch.no_grad():
                 output = model(inputs.unsqueeze(0).unsqueeze(0).float().to(device))
                 output = output.detach().cpu().squeeze().tolist()
-                print("Axis : ", axis, " Slice Number: ", i, " --  Model OP-> ", output)
+                # print("Axis : ", axis, " Slice Number: ", i, " --  Model OP-> ", output)
+                if i == 0:
+                    store = printLabel(inputs, output, disp)
+                else:
+                    temp = printLabel(inputs, output, disp)
+                    store = torch.cat((store, temp), 0)
                 if store_images:
                     store_output.append(output)
                     store_img.append(inputs.unsqueeze(2))
@@ -207,3 +217,20 @@ def testModel_Image(niftyFilePath=None, model=None, transform=None,tempPath="", 
                         store_output = []
                         store_img = []
                     itr += 1
+        temp = tio.ScalarImage(tensor=store.permute(0, 3, 2, 1))
+        print("Saved :", output_path + str(fileName) + "-" + str(axis) + '.nii.gz')
+        temp.save(output_path + str(fileName) + "-" + str(axis) + '.nii.gz', squeeze=True)
+
+
+def printLabel(img, label, disp):
+    trans = transforms.ToPILImage()
+    image = trans(img.unsqueeze(0))
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    label = round(label, 2)
+    draw.text((0, 0), str(label), 255, font=font)
+    if disp:
+        plt.imshow(image, cmap='gray')
+        plt.show()
+    trans1 = transforms.ToTensor()
+    return trans1(image).unsqueeze(0)

@@ -11,7 +11,7 @@ def main():
 
         # Configuration - System
         system_to_run = "FCM"  # Select between - StudentPC, FCM, GPU18, BRAIN
-        model_selection = 3  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
+        model_selection = 2  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
         # Configuration - GPU
         enableMultiGPU = False
@@ -29,6 +29,7 @@ def main():
         # Configuration - Testing
         num_class_confusionMatrix = 9
         path_single_file = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/temp/IXI230-IOP-0869.nii.gz"
+        output_path = "/project/mukhopad/output/"
 
         # Train Test setting
         Train = False
@@ -36,7 +37,7 @@ def main():
 
         obj = BlurDetection(data, system_to_run, model_selection, deviceIds, enableMultiGPU, defaultGPUID,
                             epochs, Tensorboard, batch_size, validation_split,
-                            num_class_confusionMatrix, path_single_file)
+                            num_class_confusionMatrix, path_single_file, output_path)
 
         if Train:
             print(" Tensorboard Logging : ", obj.log)
