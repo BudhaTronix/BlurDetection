@@ -10,13 +10,13 @@ def main():
         data = json.load(f)
 
         # Configuration - System
-        system_to_run = "FCM"  # Select between - StudentPC, FCM, GPU18, BRAIN
-        model_selection = 2  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
+        system_to_run = "StudentPC"  # Select between - StudentPC, FCM, GPU18, BRAIN
+        model_selection = 3  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
         # Configuration - GPU
         enableMultiGPU = False
         deviceIds = [3, 4]
-        defaultGPUID = "cuda:2"
+        defaultGPUID = "cuda:0"
 
         # Configuration - Logging
         Tensorboard = False
@@ -28,8 +28,9 @@ def main():
 
         # Configuration - Testing
         num_class_confusionMatrix = 9
-        path_single_file = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/temp/IXI230-IOP-0869.nii.gz"
-        output_path = "/project/mukhopad/output/"
+        path_single_file = "/home/budha/Desktop/T2W_TSE.nii.gz"
+        output_path = "/home/budha/Desktop/output/"
+        Transform_Images = True
 
         # Train Test setting
         Train = False
@@ -46,7 +47,7 @@ def main():
         if Test:
             # obj.test()
             if path_single_file != "":
-                obj.test_singleFile()
+                obj.test_singleFile(Transform_Images)
 
 
 main()

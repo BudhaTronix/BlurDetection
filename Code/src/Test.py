@@ -1,27 +1,15 @@
 import itertools
-import sys
-import os
-from pathlib import Path
-
-# from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw
-from torchvision import transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
 import torchio as tio
+from PIL import ImageFont
+from PIL import ImageDraw
+from torchvision import transforms
 from tqdm import tqdm
 from Code.Utils.utils import returnClass
-
-"""try:
-    from utils import returnClass
-except ImportError:
-    sys.path.insert(1, '../Utils/')
-    from utils import returnClass
-"""
 
 
 def saveImage(images, output):
@@ -175,7 +163,6 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
 def testModel_Image(niftyFilePath=None, model=None, transform=None, output_path="", device="cuda"):
     model.eval()
     model.to(device)
-    transformation = True
     store_images = False
     fileName = niftyFilePath.split("/")[-1].split(".nii.gz")[0]
     disp = False
@@ -192,7 +179,7 @@ def testModel_Image(niftyFilePath=None, model=None, transform=None, output_path=
         store = None
         for i in range(0, len(Subject)):
             img = Subject[i:(i + 1), :, :]
-            if transformation:
+            if transform is not None:
                 img_transformed = transform(img.unsqueeze(0)).squeeze()
             else:
                 img_transformed = img.squeeze()

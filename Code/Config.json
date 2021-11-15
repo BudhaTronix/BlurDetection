@@ -31,8 +31,8 @@
     },
     "model_bestweight_Path": {
       "1": "../../model_weights/RESNET18_bestWeights.pth",
-      "2": "../../model_weights/RESNET50_bestWeights.pth",
-      "3": "../../model_weights/RESNET101_bestWeights.pth"
+      "2": "../model_weights/RESNET50_bestWeights.pth",
+      "3": "../model_weights/RESNET101_bestWeights.pth"
     },
     "log_dir": {
       "1": "runs/BlurDetection/Training/ResNet18/{}",
