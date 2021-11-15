@@ -10,8 +10,8 @@ def main():
         data = json.load(f)
 
         # Configuration - System
-        system_to_run = "StudentPC"  # Select between - StudentPC, FCM, GPU18, BRAIN
-        model_selection = 3  # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
+        system_to_run = "StudentPC"                                     # Select between - StudentPC, FCM, GPU18, BRAIN
+        model_selection = 3                                       # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
         # Configuration - GPU
         enableMultiGPU = False
@@ -28,8 +28,9 @@ def main():
 
         # Configuration - Testing
         num_class_confusionMatrix = 9
-        path_single_file = "/home/budha/Desktop/T2W_TSE.nii.gz"
-        output_path = "/home/budha/Desktop/output/M1/"
+        path_single_file = "/home/budha/Desktop/T2W_TSE.nii.gz"                # Single file for testing
+        output_path = "/home/budha/Desktop/output/M1/"                         # Output of model in Testing
+        custom_model_path = ""                                                 # Use this path to load a different model
         Transform_Images = True
 
         # Train Test setting
@@ -47,7 +48,10 @@ def main():
         if Test:
             # obj.test()
             if path_single_file != "":
-                obj.test_singleFile(Transform_Images)
+                if custom_model_path != "":
+                    obj.test_singleFile(Transform_Images, custom_model_path)
+                else:
+                    obj.test_singleFile(Transform_Images)
 
 
 main()
