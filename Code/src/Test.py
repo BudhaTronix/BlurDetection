@@ -1,3 +1,4 @@
+import os
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
@@ -161,6 +162,8 @@ def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):
 
 
 def testModel_Image(niftyFilePath=None, model=None, transform=None, output_path="", device="cuda"):
+    if not os.path.isdir(output_path):
+        os.mkdir(output_path)
     model.eval()
     model.to(device)
     store_images = False

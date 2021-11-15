@@ -29,7 +29,7 @@ def main():
         # Configuration - Testing
         num_class_confusionMatrix = 9
         path_single_file = "/home/budha/Desktop/T2W_TSE.nii.gz"
-        output_path = "/home/budha/Desktop/output/"
+        output_path = "/home/budha/Desktop/output/M1/"
         Transform_Images = True
 
         # Train Test setting

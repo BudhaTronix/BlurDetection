@@ -2,11 +2,10 @@ from __future__ import division
 from __future__ import print_function
 
 import time
-from datetime import datetime
-
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
 from torch.cuda.amp import autocast, GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -40,7 +39,6 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
         start_time = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
         TBLOGDIR = log_dir.format(start_time)
         writer = SummaryWriter(TBLOGDIR)
-    best_model_wts = ""
     best_acc = 0.0
     best_val_loss = 99999
     since = time.time()
@@ -109,17 +107,15 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
                     writer.add_scalar("Acc/Validation", epoch_acc, epoch)
 
             print('\n{} Loss: {:.4f} Acc: {:.4f}'.format(mode, epoch_loss, epoch_acc))
-            # deep copy the model
+            # saving best weights
             if phase == 1 and (epoch_acc >= best_acc or epoch_loss < best_val_loss):
                 print("\nSaving the best model weights")
                 best_acc = epoch_acc
                 best_val_loss = epoch_loss
-                # best_model_wts = copy.deepcopy(model.state_dict())
                 if isMultiGPU:
                     torch.save(model.module.state_dict(), modelPath_bestweight)  # For multi GPU
                 else:
                     torch.save(model.state_dict(), modelPath_bestweight)
-                # torch.save(model, modelPath_bestweight)
 
     time_elapsed = time.time() - since
     print('\nTraining complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -127,8 +123,3 @@ def trainModel(dataloaders, modelPath, modelPath_bestweight, num_epochs, model,
     print("\nSaving the model")
     # save the model
     torch.save(model, modelPath)
-    # load best model weights
-
-    # print("\nSaving the best weights model")
-    # model.load_state_dict(best_model_wts)
-    # torch.save(model, modelPath_bestweight)

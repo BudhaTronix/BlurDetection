@@ -13,13 +13,6 @@ from Code.src.Test import testModel, testModel_Image
 from Code.src.Train import trainModel
 from Code.Utils.CSVGenerator import checkCSV
 from Code.Utils.utils import getSubjects
-"""try:
-    from Code.Utils.CSVGenerator import checkCSV
-    from Code.Utils.utils import getSubjects
-except ImportError:
-    sys.path.insert(1, '../Utils/')
-    from CSVGenerator import checkCSV
-    from utils import getSubjects"""
 
 
 class BlurDetection:
