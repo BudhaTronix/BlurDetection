@@ -167,8 +167,6 @@ def testModel_Image(niftyFilePath=None, model=None, transform=None, output_path=
     model.eval()
     model.to(device)
     store_images = False
-
-
     fileName = niftyFilePath.split("/")[-1].split(".nii.gz")[0]
     disp = False
     Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
