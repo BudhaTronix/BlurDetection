@@ -1,4 +1,5 @@
 import os
+import pydicom
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -32,7 +33,7 @@ class Test:
     @staticmethod
     def printLabel(img, label, disp):
         trans = transforms.ToPILImage()
-        image = trans(img.unsqueeze(0))
+        image = trans(img.unsqueeze(0).float())
         draw = ImageDraw.Draw(image)
         font = ImageFont.load_default()
         label = round(label, 2)
@@ -67,8 +68,10 @@ class Test:
         model.to(device)
         store_images = False
         fileName = niftyFilePath.split("/")[-1].split(".nii.gz")[0]
+        print(fileName)
         disp = False
         Subject = tio.ScalarImage(niftyFilePath)[tio.DATA].squeeze()
+        print(Subject.shape)
         SSIM_lowest = 1
         slice_number = 0
         SSIM_ctr = []
