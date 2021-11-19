@@ -46,7 +46,7 @@ def main():
             print(" Validation Split    : ", obj.val_split * 100, "%")
             obj.train()
         if Test:
-            # obj.test()
+            # obj.test_filename()
             if path_single_file != "":
                 if custom_model_path != "":
                     obj.test_singleFile(Transform_Images, custom_model_path)

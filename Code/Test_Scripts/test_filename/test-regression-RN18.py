@@ -5,8 +5,8 @@ from HelperFunctions import Test
 
 def main():
     model_selection = 1
-    model_path = "./model_weights/RESNET18_bestWeights.pth"
-    output_path = "./Outputs/ResNet18/"
+    model_path = "../model_weights/RESNET18_bestWeights.pth"
+    output_path = "Outputs/ResNet18/"
     try:
         # Arguments passed
         print("\nName of Python script:", sys.argv[0])

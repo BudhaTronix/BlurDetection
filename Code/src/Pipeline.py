@@ -51,7 +51,7 @@ class BlurDetection:
         self.transform_val = (1, 224, 224)  # Set this value if you want custom transformation
         self.multiGPUTraining = enableMultiGPU
         self.deviceIDs = deviceIds
-        self.delete_dir = False  # Set to true if you want to delete the temp directory of test dataset
+        self.delete_dir = False  # Set to true if you want to delete the temp directory of test_filename dataset
         self.useModel = False  # Set to False for testing model against GT
         self.class_cfm = num_class_confusionMatrix
 
@@ -153,7 +153,7 @@ class BlurDetection:
         return [train_loader, validation_loader]
 
     def getTestdataloader(self):
-        checkCSV(dataset_Path=self.test_dataset_Path, csv_FileName="test.csv", subjects=None,
+        checkCSV(dataset_Path=self.test_dataset_Path, csv_FileName="test_filename.csv", subjects=None,
                  overwrite=self.OverWriteCSVFile)
         test_loader = self.getDataloader(dataset_Path=self.dataset_Path, csv_FileName="train.csv",
                                          transform=self.getTransformation())

@@ -21,7 +21,7 @@ except ImportError:
 class TestingScript:
     def __init__(self):
         self.dataset_Path = "/project/mukhopad/tmp/BlurDetection_tmp/Dataset/TestDataset/"
-        self.csv_FileName = "test.csv"
+        self.csv_FileName = "test_filename.csv"
         self.modelPath = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R50.pth'
         self.modelPath_bestweights = '/project/mukhopad/tmp/BlurDetection_tmp/model_weights/R50.pth'
 
@@ -86,7 +86,7 @@ class TestingScript:
                 else:
                     print("Successfully deleted the directory %s" % self.tempPath)
 
-    def testModelScript_Dataloader(self, test_dataset_Path, csv_FileName="test.csv", generateCSV=False):
+    def testModelScript_Dataloader(self, test_dataset_Path, csv_FileName="test_filename.csv", generateCSV=False):
         checkCSV(dataset_Path=test_dataset_Path, csv_FileName=csv_FileName, subjects=None, overwrite=generateCSV)
         dataset = CustomDataset(dataset_path=test_dataset_Path, csv_file=test_dataset_Path + csv_FileName,
                                 transform=self.transform, useModel=self.useModel)
