@@ -176,8 +176,7 @@ class BlurDetection:
 
     def test(self):
         test_loader = self.getTestdataloader()
-        model = self.defineModel()
-        model.load_state_dict(torch.load(self.modelPath_bestweights, map_location=self.getDevice()))
+        model = torch.load(self.modelPath, map_location=self.getDevice())
         print("Testing model with saved weights")
         testModel(dataloaders=test_loader, model=model,
                   debug=False, no_class=self.class_cfm, device=self.getDevice())
@@ -193,7 +192,7 @@ class BlurDetection:
             model.load_state_dict(torch.load(self.modelPath_bestweights, map_location=self.getDevice()))
         except:
             print("Cannot load model weights, trying to load model")
-            model = torch.load(self.modelPath_bestweights)
+            model = torch.load(self.modelPath_bestweights, map_location=self.getDevice())
         print("Testing model with saved weights")
         testModel_Image(niftyFilePath=self.testFile, model=model,
                         transform=transform, output_path=self.output_path)

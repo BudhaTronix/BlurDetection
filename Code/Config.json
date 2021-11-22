@@ -25,9 +25,9 @@
     "Dataset_Path": "/media/hdd_storage/Budha/Dataset/TrainDataset/",
     "Test_Dataset_Path": "/media/hdd_storage/Budha/Dataset/TestDataset/",
     "model_Path": {
-      "1": "../../model_weights/RESNET18.pth",
-      "2": "../../model_weights/RESNET50.pth",
-      "3": "../../model_weights/RESNET101.pth"
+      "1": "../model_weights/RESNET18.pth",
+      "2": "../model_weights/RESNET50.pth",
+      "3": "../model_weights/RESNET101.pth"
     },
     "model_bestweight_Path": {
       "1": "../../model_weights/RESNET18_bestWeights.pth",

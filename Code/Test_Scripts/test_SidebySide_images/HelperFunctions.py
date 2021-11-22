@@ -9,7 +9,8 @@ from PIL import ImageFont
 from PIL import ImageDraw
 from torchvision import models
 from torchvision import transforms
-from skimage.metrics import structural_similarity as ssim
+# from skimage.metrics import structural_similarity as ssim
+from Code.Utils.pytorch_ssim import ssim
 
 
 class Test:
@@ -20,16 +21,8 @@ class Test:
         self.output_path = out_path
         self.defaultGPU = "cuda:0"
         self.modelPath_bestweights = model_path
+        self.save = True
 
-    def saveImage(self, images, output):
-        # create grid of images
-        plt.figure(figsize=(10, 10))
-        for i in range(16):
-            plt.subplot(4, 4, i + 1, title=" | Pred:" + str(np.around(output[i], 2)))
-            plt.xticks([])
-            plt.yticks([])
-            plt.imshow(images[i], cmap="gray")
-        plt.show()
 
     @staticmethod
     def printLabel(img, pred, label, disp):
@@ -83,7 +76,7 @@ class Test:
         SSIM_pred = []
         SSIM_actual = []
         # Traverse through the dataset to get the ssim values
-        itr = 1
+
         store = None
         for i in range(0, len(Subject.permute(2, 0, 1))):
             orig = orig_image[:, :, i:(i + 1)].permute(2, 1, 0)
@@ -94,7 +87,8 @@ class Test:
             else:
                 img = img.squeeze()
                 orig = orig.squeeze()
-            ssim_none = ssim(img.detach().cpu().numpy(), orig.detach().cpu().numpy(), data_range=1)
+            # ssim_none = ssim(img.detach().cpu().numpy(), orig.detach().cpu().numpy(), data_range=1)
+            ssim_none = ssim(img.detach().cpu().unsqueeze(0).unsqueeze(0), orig.detach().cpu().unsqueeze(0).unsqueeze(0)).squeeze().mean().item()
             SSIM_actual.append(ssim_none)
             with torch.no_grad():
                 output = model(img.unsqueeze(0).unsqueeze(0).float().to(device))
@@ -111,11 +105,13 @@ class Test:
                 if output < SSIM_lowest and not np.isnan(output):
                     SSIM_lowest = output
                     slice_number = i
-        temp = tio.ScalarImage(tensor=store.permute(0, 3, 2, 1))
+
         print("\nLowest SSIM val in Slice Number : ", slice_number, " --  SSIM Val : ", SSIM_lowest)
         print("Average SSIM val : ", sum(SSIM_ctr) / len(SSIM_ctr))
-        print("Saved :", output_path + str(fileName) + '.nii.gz')
-        temp.save(output_path + str(fileName) + '.nii.gz', squeeze=True)
+        if self.save:
+            temp = tio.ScalarImage(tensor=store.permute(0, 3, 2, 1))
+            print("Saved :", output_path + str(fileName) + '.nii.gz')
+            temp.save(output_path + str(fileName) + '.nii.gz', squeeze=True)
 
         return SSIM_actual, SSIM_pred
 

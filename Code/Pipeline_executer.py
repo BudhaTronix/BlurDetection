@@ -35,16 +35,19 @@ def main():
 
         # Train Test setting
         Train = False
-        Test = True
+        Test = False
 
         obj = BlurDetection(data, system_to_run, model_selection, deviceIds, enableMultiGPU, defaultGPUID,
                             epochs, Tensorboard, batch_size, validation_split,
                             num_class_confusionMatrix, path_single_file, output_path)
 
+        obj.test()
+
         if Train:
             print(" Tensorboard Logging : ", obj.log)
             print(" Validation Split    : ", obj.val_split * 100, "%")
             obj.train()
+
         if Test:
             # obj.test_filename()
             if path_single_file != "":
@@ -52,6 +55,7 @@ def main():
                     obj.test_singleFile(Transform_Images, custom_model_path)
                 else:
                     obj.test_singleFile(Transform_Images)
+
 
 
 main()
