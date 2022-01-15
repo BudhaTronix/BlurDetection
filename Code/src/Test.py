@@ -11,6 +11,7 @@ from PIL import ImageDraw
 from torchvision import transforms
 from tqdm import tqdm
 from Code.Utils.utils import returnClass
+from sklearn.metrics import f1_score, mean_squared_error
 
 
 def saveImage(images, output):
@@ -36,14 +37,14 @@ def visualize(pred, label, no_class):
     plt.show()
     sns.lmplot(x="label", y="pred", data=df)
     plt.show()
-    sns.lmplot(x="label", y="pred", data=df, x_estimator=np.mean)
+    """sns.lmplot(x="label", y="pred", data=df, x_estimator=np.mean)
     plt.show()
     df = pd.DataFrame(
         {'pred': returnClass(no_class, pred),
          'label': returnClass(no_class, label),
          })
     sns.boxplot(x="label", y="pred", data=df)
-    plt.show()
+    plt.show()"""
 
 
 def plot_confusion_matrix(cm, classes, normalize=True, title='Confusion matrix', cmap=plt.cm.Blues):
@@ -93,20 +94,38 @@ def calMeanAbsError(expected, predicted):
     print("Variance               : ", np.std(errors), "\n")
 
 
-def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
-    print("Model In Testing mode")
+def getCF(dataloaders, no_class, model, debug=False, device="cuda"):
+    print("Generating CF In Testing mode")
     model.eval()
     model.to(device)
-    running_corrects = 0
-    batch_c = 0
-    lbl = pred = []
     nb_classes = no_class
     cf = torch.zeros(nb_classes, nb_classes)
     with torch.no_grad():
         for i, (inputs, classes) in tqdm(enumerate(dataloaders)):
             inputs = inputs.unsqueeze(1).float()
             inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
-            classes = classes  # .to(device)
+            classes = classes
+            outputs = model(inputs.to(device))
+            op_class = returnClass(no_class, outputs.squeeze().detach().cpu().numpy()).astype(int)
+            lbl_class = returnClass(no_class, classes).numpy().astype(int)
+            for t, p in zip(lbl_class, op_class):
+                cf[t, p] += 1
+    cf = cf.detach().cpu().numpy()
+    cf = cf.astype(int)
+    plot_confusion_matrix(cm=cf, classes=no_class)
+
+
+def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
+    print("Model In Testing mode")
+    model.eval()
+    model.to(device)
+    lbl = []
+    pred = []
+    with torch.no_grad():
+        for i, (inputs, classes) in tqdm(enumerate(dataloaders)):
+            inputs = inputs.unsqueeze(1).float()
+            inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min())  # Min Max normalization
+            classes = classes
             outputs = model(inputs.to(device))
             if len(lbl) == 0:
                 lbl = classes.cpu().tolist()
@@ -115,33 +134,27 @@ def testModel(dataloaders, no_class, model, debug=False, device="cuda"):
                 lbl.extend(classes.cpu().tolist())
                 pred.extend(outputs.detach().cpu().squeeze().tolist())
 
-            op_class = returnClass(no_class, outputs.squeeze().detach().cpu().numpy()).astype(int)
-            lbl_class = returnClass(no_class, classes).numpy().astype(int)
-            for t, p in zip(lbl_class, op_class):
-                cf[t, p] += 1
+    lbl_class = returnClass(no_class, np.asarray(lbl))
+    pred_class = returnClass(no_class, np.asarray(pred))
 
-            out = np.sum(op_class == lbl_class)
-            batch_c += len(inputs)
-            running_corrects += out
-            if debug:
-                print("Raw Output    : Model OP-> ", outputs.detach().cpu().squeeze().tolist(), ", Label-> ",
-                      classes.cpu().tolist())
-                print("Class Output  : Model OP-> ", op_class, ", \nLabel-> ", lbl_class, "\n")
-                print("Accuracy per batch :", float(out / len(inputs) * 100), "%")
+    # Accuracy Cal
+    total_acc = np.sum(pred_class == lbl_class)
 
-    cf = cf.detach().cpu().numpy()
-    cf = cf.astype(int)
-    plot_confusion_matrix(cm=cf, classes=no_class)
+    # F1 Cal
+    f1_micro_val = f1_score(lbl_class, pred_class, average='micro')
+    f1_macro_val = f1_score(lbl_class, pred_class, average='macro')
 
-    total_acc = running_corrects
-    print("\nTotal Correct :", total_acc, ", out of :", batch_c)
-    print("Accuracy      :", float(total_acc / batch_c * 100), "%\n")
+    # RMSE Cal
+    rmse = mean_squared_error(lbl, pred, squared=False)
 
-    lbl = np.float32(lbl)
-    pred = np.float32(pred)
-    calMeanAbsError(predicted=pred, expected=lbl)
-    calMSE(predicted=pred, expected=lbl)
-    # visualize(pred, lbl, no_class)
+    print("\nTotal Correct :", total_acc, ", out of :", len(lbl))
+    print("\nAccuracy      :", float(total_acc / len(lbl) * 100), "%\n")
+    print("\nF1 micro score: ", f1_micro_val)
+    print("F1 macro score: ", f1_macro_val)
+    print("\nRegression based RMSE: ", rmse)
+
+    visualize(pred, lbl, no_class)
+
 
 
 def getModelOP(dataloaders, modelPath, debug=False, device="cuda"):

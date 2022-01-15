@@ -11,7 +11,7 @@ def main():
 
         # Configuration - System
         system_to_run = "StudentPC"                                     # Select between - StudentPC, FCM, GPU18, BRAIN
-        model_selection = 3                                       # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
+        model_selection = 1                                       # Set 1 for Resnet18, 2 for ResNet50, 3 for ResNet101
 
         # Configuration - GPU
         enableMultiGPU = False
@@ -41,8 +41,9 @@ def main():
                             epochs, Tensorboard, batch_size, validation_split,
                             num_class_confusionMatrix, path_single_file, output_path)
 
+        print("Model selection : ", model_selection)
         obj.test()
-
+        exit()
         if Train:
             print(" Tensorboard Logging : ", obj.log)
             print(" Validation Split    : ", obj.val_split * 100, "%")

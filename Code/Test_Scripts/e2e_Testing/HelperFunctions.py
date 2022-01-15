@@ -11,6 +11,7 @@ from PIL import ImageFont
 from PIL import ImageDraw
 from torchvision import models
 from torchvision import transforms
+from sklearn.metrics import f1_score, mean_squared_error
 
 
 class Test:
@@ -31,6 +32,14 @@ class Test:
             plt.yticks([])
             plt.imshow(images[i], cmap="gray")
         plt.show()
+
+    def returnClass(self, no_of_class, array):
+        class_intervals = 1 / no_of_class
+        array[array <= 0] = 0
+        array[array >= 1] = no_of_class - 1
+        for i in range(no_of_class - 1, -1, -1):
+            array[(array > (class_intervals * i)) & (array <= (class_intervals * (i + 1)))] = i
+        return array
 
     @staticmethod
     def printLabel(img, pred, label, disp):
@@ -83,6 +92,8 @@ class Test:
         mu = 0.0
         inpPath = Path(self.file_path)
         print("\n Loading Files")
+        f1_micro_val = 0
+        f1_macro_val = 0
         for file_name in sorted(inpPath.glob("*T2*.nii.gz")):
             print("\nWorking on File             : ", file_name.name)
             fileName = file_name.name
@@ -105,7 +116,10 @@ class Test:
             imgOrig_op = imgOrig
             SSIM_lowest = 1
             slice_number = 0
-            SSIM_ctr = []
+            SSIM_pred = []
+            SSIM_lbl = []
+            rmse = 0
+            count = 0
             for axis in range(0, 3):
                 if axis == 1:
                     imgReg_op = imgReg.permute(0, 2, 3, 1)
@@ -119,9 +133,11 @@ class Test:
                 else:
                     imgReg_ssim = imgReg_op
                     imgOrig_ssim = imgOrig_op
+
                 # Calculate the SSIM
-                ssim = pytorch_ssim.ssim(imgOrig_ssim.double(), imgReg_ssim.double()).mean(0).mean(1).mean(
-                    1).detach().cpu()
+                ssim = pytorch_ssim.ssim(imgOrig_ssim.double(), imgReg_ssim.double()).mean(0).mean(1).mean(1).detach().cpu()
+
+                # Traverse each direction of the image
                 for slice in range(0, len(imgReg_op.squeeze())):
                     # Get the slice image of the subject
                     image = imgReg_op[:, slice:(slice + 1), :, :]
@@ -133,23 +149,32 @@ class Test:
                         output = model(inputs.unsqueeze(0).unsqueeze(0).float().to(device))
                         output = output.detach().cpu().squeeze().tolist()
                         if not np.isnan(output):
-                            SSIM_ctr.append(output)
+                            SSIM_pred.append(output)
+                            SSIM_lbl.append(ssim[slice].item())
                         if slice == 0:
-                            store = self.printLabel(inputs, output, ssim[slice].item(),  disp)
+                            store = self.printLabel(inputs, output, ssim[slice].item(), disp)
                         else:
                             temp = self.printLabel(inputs, output, ssim[slice].item(), disp)
                             store = torch.cat((store, temp), 0)
                         if output < SSIM_lowest and not np.isnan(output):
                             SSIM_lowest = output
                             slice_number = slice
-                    # print("Axis:", axis, "  Slice Number:", slice, "  Prediction:", output, "  SSIM:",ssim[slice].item())
 
-                print("\nLowest SSIM val in Axis  ", axis, " ->   Slice Number : ", slice_number, " --  SSIM Val : ",
-                      SSIM_lowest)
-                print("Average Predicted SSIM val in Axis ", axis, "  : ", sum(SSIM_ctr) / len(SSIM_ctr))
-                print("Average Actual SSIM val in Axis    ", axis, "  : ", ssim.mean().item())
-                print("Saved :", self.output_path + str(fileName) + "-" + str(axis) + '.nii.gz')
-                temp = tio.ScalarImage(tensor=store.permute(0, 3, 2, 1))
-                temp.save(self.output_path + str(fileName) + "-" + str(axis) + '.nii.gz', squeeze=True)
+                no_class = 9
+                lbl_class = self.returnClass(no_class, np.asarray(SSIM_lbl))
+                pred_class = self.returnClass(no_class, np.asarray(SSIM_pred))
+
+                # F1 Cal
+                f1_micro_val += f1_score(lbl_class, pred_class, average='micro')
+                f1_macro_val += f1_score(lbl_class, pred_class, average='macro')
+
+                # RMSE Cal
+                rmse += mean_squared_error(lbl_class, pred_class, squared=False)
+                count += 1
+
+            print("Avg F1 micro score for Subject ", fileName, " : ", f1_micro_val / count)
+            print("Avg F1 macro score for Subject ", fileName, " : ", f1_macro_val / count)
+            print("Avg RMSE score for Subject ", fileName, " : ", rmse / count)
+            print("\n")
 
             break
