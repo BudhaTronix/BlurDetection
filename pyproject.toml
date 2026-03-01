@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blur-detection"
+version = "1.0.0"
+description = "Production wrapper around legacy MRI blur detection pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "BlurDetection Maintainers" }
+]
+
+[project.scripts]
+blur-detection = "blur_detection.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
