@@ -1,12 +1,23 @@
 import json
+from pathlib import Path
+
 from Code.src.Pipeline import BlurDetection
 
 # os.environ['HTTP_PROXY'] = 'http://proxy:3128/'
 # os.environ['HTTPS_PROXY'] = 'http://proxy:3128/'
 
 
+def _resolve_config_path() -> Path:
+    """Keep legacy behavior but make config loading robust to current working directory."""
+    local_config = Path(__file__).resolve().parent / "Config.json"
+    if local_config.exists():
+        return local_config
+    fallback = Path("Config.json").resolve()
+    return fallback
+
+
 def main():
-    with open('Config.json') as f:
+    with _resolve_config_path().open("r", encoding="utf-8") as f:
         data = json.load(f)
 
         # Configuration - System
@@ -58,5 +69,5 @@ def main():
                     obj.test_singleFile(Transform_Images)
 
 
-
-main()
+if __name__ == "__main__":
+    main()
